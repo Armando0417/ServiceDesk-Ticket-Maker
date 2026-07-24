@@ -7,7 +7,6 @@
 #    GET  /api/config    → sends ALL config to the frontend (single source of truth)
 #    GET  /api/ad        → AD lookup
 #    POST /api/clipboard → copies text to clipboard
-#    POST /api/save      → writes ticket JSON to current_user.json
 #
 #  Bound to 127.0.0.1 ONLY. Nothing leaves this machine.
 # ============================================================================
@@ -26,7 +25,6 @@ $WebDir          = Join-Path $BaseDir 'web'
 $ConfigFile      = Join-Path $BaseDir 'config.json'
 $TemplateFile    = Join-Path $BaseDir 'block_template.txt'
 $TemplateMapFile = Join-Path $BaseDir 'templates.json'
-$OutputFile      = Join-Path $BaseDir 'current_user.json'
 
 $Port   = 8080
 $Origin = "http://127.0.0.1:$Port"
@@ -486,18 +484,6 @@ function Handle-Request($context) {
             Send-Json $res $result
         } catch {
             Send-Json $res @{ ok = $false; error = 'Invalid request body.' } 400
-        }
-        return
-    }
-
-    # ── POST /api/save ─────────────────────────────────────────────────
-    if ($path -eq '/api/save' -and $method -eq 'POST') {
-        $body = Read-RequestBody $req
-        try {
-            Set-Content -Path $OutputFile -Value $body -Encoding UTF8
-            Send-Json $res @{ ok = $true; path = $OutputFile }
-        } catch {
-            Send-Json $res @{ ok = $false; error = "Save failed: $($_.Exception.Message)" } 500
         }
         return
     }

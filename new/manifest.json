@@ -1,0 +1,21 @@
+{
+    "manifest_version": 3,
+    "name": "Ticket Autofill",
+    "version": "1.1",
+    "description": "Auto-fills ManageEngine ServiceDesk fields from clipboard JSON and runs workday ticket exports triggered by the Ticket Generator.",
+    "content_scripts": [
+        {
+            "matches": [
+                "https://servicedesk.mmmhc.com/*"
+            ],
+            "js": ["content.js"],
+            "run_at": "document_idle"
+        }
+    ],
+    "permissions": [
+        "clipboardRead"
+    ],
+    "icons": {
+        "48": "icon.png"
+    }
+}

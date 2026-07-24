@@ -344,20 +344,22 @@ function AF_createHUD() {
 
     var hud = document.createElement('div');
     hud.id = 'af-hud';
-    hud.style.cssText = 'position:fixed;top:10px;right:10px;width:260px;background:#18181cee;border:1px solid #333;border-radius:8px;font-family:Consolas,monospace;font-size:11px;color:#e0ddd6;z-index:999999;box-shadow:0 8px 24px rgba(0,0,0,0.4)';
+    // Styling mirrors new/index.html: white cards, #e2e6ec borders,
+    // blue accent (#2e7cf6), slate text ramp, 12px card radius.
+    hud.style.cssText = 'position:fixed;top:10px;right:10px;width:260px;background:#ffffff;border:1px solid #e2e6ec;border-radius:12px;font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;font-size:11.5px;color:#0a0f1c;z-index:999999;box-shadow:0 1px 2px rgba(15,23,42,0.06),0 8px 16px -4px rgba(15,23,42,0.1),0 20px 32px -8px rgba(15,23,42,0.12);overflow:hidden';
 
     hud.innerHTML = [
-        '<div id="af-header" style="padding:8px 12px;background:#1a1a1f;border-bottom:1px solid #333;color:#d4a843;font-weight:bold;font-size:12px;cursor:move;display:flex;justify-content:space-between">',
+        '<div id="af-header" style="padding:8px 12px;background:#fafbfd;border-bottom:1px solid #e2e6ec;color:#04070d;font-weight:600;font-size:12px;letter-spacing:-0.15px;cursor:move;display:flex;justify-content:space-between">',
         ' <span>L1 Autofill</span>',
-        ' <span id="af-min" style="cursor:pointer;color:#888">_</span>',
+        ' <span id="af-min" style="cursor:pointer;color:#64748b">_</span>',
         '</div>',
         '<div id="af-body" style="padding:8px 12px">',
-        ' <div id="af-status" style="color:#8a877f;margin-bottom:6px">No data loaded</div>',
-        ' <button id="af-load" style="display:block;width:100%;padding:6px;background:#d4a843;color:#18181c;border:none;border-radius:4px;font-family:inherit;font-size:11px;font-weight:bold;cursor:pointer;margin-bottom:6px">Load from Clipboard</button>',
-        ' <div style="color:#555;font-size:10px;margin-bottom:2px">Or paste JSON:</div>',
-        ' <textarea id="af-paste" style="width:100%;height:40px;background:#111;color:#aaa;border:1px solid #333;border-radius:4px;padding:4px;font-family:Consolas,monospace;font-size:10px;resize:vertical;margin-bottom:6px"></textarea>',
+        ' <div id="af-status" style="color:#64748b;margin-bottom:6px">No data loaded</div>',
+        ' <button id="af-load" style="display:block;width:100%;padding:6px;background:linear-gradient(180deg,#4287f7 0%,#2e7cf6 100%);color:#ffffff;border:1px solid #1a5fd0;border-radius:7px;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;margin-bottom:6px;box-shadow:0 1px 2px rgba(46,124,246,0.4)">Load from Clipboard</button>',
+        ' <div style="color:#94a3b8;font-size:10px;margin-bottom:2px">Or paste JSON:</div>',
+        ' <textarea id="af-paste" style="width:100%;height:40px;background:#f7f9fc;color:#334155;border:1px solid #e2e6ec;border-radius:7px;padding:4px;font-family:Consolas,monospace;font-size:10px;resize:vertical;margin-bottom:6px"></textarea>',
         ' <div id="af-fields" style="max-height:180px;overflow-y:auto;margin-bottom:6px"></div>',
-        ' <div id="af-log" style="max-height:80px;overflow-y:auto;border-top:1px solid #333;padding-top:4px;font-size:10px;color:#666"></div>',
+        ' <div id="af-log" style="max-height:80px;overflow-y:auto;border-top:1px solid #e2e6ec;padding-top:4px;font-size:10px;color:#94a3b8"></div>',
         '</div>'
     ].join('\n');
 
@@ -405,10 +407,10 @@ function AF_updateHUD() {
         var v = m.val(AF_data);
         if (!v) continue;
         var done = AF_filled[k];
-        var c = done ? '#5cb85c' : '#8a877f';
+        var c = done ? '#15803d' : '#64748b';
         var icon = done ? '>' : ' ';
         var prev = v.length > 25 ? v.substring(0, 25) + '..' : v;
-        html += '<div style="padding:1px 0;color:' + c + '">' + icon + ' <span style="color:#bbb">' + m.label + ':</span> ' + prev.replace(/</g, '&lt;') + '</div>';
+        html += '<div style="padding:1px 0;color:' + c + '">' + icon + ' <span style="color:#334155">' + m.label + ':</span> ' + prev.replace(/</g, '&lt;') + '</div>';
     }
     fl.innerHTML = html;
 }
@@ -418,7 +420,7 @@ function AF_log(msg) {
     if (!lg) return;
     var t = new Date();
     var ts = [t.getHours(), t.getMinutes(), t.getSeconds()].map(function(n){ return n < 10 ? '0'+n : ''+n; }).join(':');
-    lg.innerHTML += '<div style="color:#5cb85c">' + ts + ' ' + msg + '</div>';
+    lg.innerHTML += '<div style="color:#15803d">' + ts + ' ' + msg + '</div>';
     lg.scrollTop = lg.scrollHeight;
 }
 
@@ -432,7 +434,7 @@ function AF_loadData(data) {
     AF_loadId++;
     AF_active = true;
     var st = document.getElementById('af-status');
-    if (st) { st.style.color = '#5cb85c'; st.textContent = 'Loaded: ' + (data.name || data.user || 'ticket'); }
+    if (st) { st.style.color = '#15803d'; st.textContent = 'Loaded: ' + (data.name || data.user || 'ticket'); }
     AF_updateHUD();
     AF_log('Data loaded - click/tab fields to fill');
     console.log('[AF] Data loaded:', data.name || data.user);
@@ -447,13 +449,237 @@ async function AF_loadClipboard() {
         if (pb) pb.value = text;
     } catch(e) {
         var st = document.getElementById('af-status');
-        if (st) { st.style.color = '#c94040'; st.textContent = 'Clipboard failed - paste JSON below'; }
+        if (st) { st.style.color = '#dc2626'; st.textContent = 'Clipboard failed - paste JSON below'; }
         console.log('[AF] Clipboard error:', e.message);
     }
+}
+
+// ====================================================================
+// DAY EXPORT (auto-run)
+// The local Ticket Generator opens a ServiceDesk tab with
+// #af-export=<urlencoded json> ({date, start, end}) in the URL.
+// The request is parked in sessionStorage so it survives the login
+// redirect, then runs here — on the ServiceDesk origin, with the
+// user's session — and downloads the workday JSON automatically.
+// ====================================================================
+var AF_EXPORT_KEY = 'af_day_export';
+var AF_exportRunning = false;
+
+var AF_EXPORT_CFG = {
+    filterId: "302",
+    pageSize: 100,
+    maxPages: 100,
+    fields: [
+        "id", "subject", "short_description", "created_time", "created_by",
+        "responded_time", "completed_time", "resolved_time", "due_by_time",
+        "requester", "technician", "priority", "site", "status", "group",
+        "template", "category", "is_service_request", "is_overdue",
+        "is_first_response_overdue", "is_fcr", "has_notes", "has_attachments"
+    ]
+};
+
+function AF_exportStatus(msg, color) {
+    var st = document.getElementById('af-status');
+    if (st) { st.style.color = color || '#64748b'; st.textContent = msg; }
+    console.log('[AF] ' + msg);
+}
+
+function AF_captureExportRequest() {
+    var m = location.hash.match(/af-export=([^&]+)/);
+    if (!m) return;
+    try {
+        var params = JSON.parse(decodeURIComponent(m[1]));
+        if (params && params.date) sessionStorage.setItem(AF_EXPORT_KEY, JSON.stringify(params));
+    } catch (e) {
+        console.log('[AF] Ignoring bad export params:', e.message);
+    }
+    // Clean the hash so a refresh doesn't re-capture it
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+}
+
+// Resolves true when finished, false when blocked on sign-in (retry later).
+async function AF_runDayExport(params) {
+    var CONFIG = AF_EXPORT_CFG;
+    var selectedDate = params.date;
+    var startHour = Number(params.start);
+    var endHour = Number(params.end);
+
+    if (!Number.isInteger(startHour) || !Number.isInteger(endHour) ||
+        startHour < 0 || startHour > 23 || endHour < 1 || endHour > 24 || endHour <= startHour) {
+        throw new Error('The workday hours are invalid.');
+    }
+
+    var dayStart = new Date(selectedDate + 'T00:00:00');
+    var rangeStart = new Date(dayStart);
+    var rangeEnd = new Date(dayStart);
+    rangeStart.setHours(startHour, 0, 0, 0);
+    rangeEnd.setHours(endHour, 0, 0, 0);
+
+    var startMs = rangeStart.getTime();
+    var endMs = rangeEnd.getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+        throw new Error('Invalid date. Enter it in YYYY-MM-DD format.');
+    }
+
+    console.log('[AF] Exporting tickets from ' + rangeStart.toLocaleString() +
+        ' through ' + rangeEnd.toLocaleString());
+
+    var downloadedRequests = [];
+    var startIndex = 1;
+    var pageNumber = 1;
+    var shouldContinue = true;
+
+    while (shouldContinue && pageNumber <= CONFIG.maxPages) {
+        var inputData = {
+            list_info: {
+                row_count: CONFIG.pageSize,
+                start_index: startIndex,
+                get_total_count: true,
+                sort_field: "created_time",
+                sort_order: "desc",
+                filter_by: { id: CONFIG.filterId },
+                fields_required: CONFIG.fields
+            },
+            for: "list_view_filter"
+        };
+
+        var query = new URLSearchParams({
+            input_data: JSON.stringify(inputData),
+            SUBREQUEST: "XMLHTTP",
+            _: Date.now().toString()
+        });
+
+        var url = '/api/v3/requests?' + query.toString();
+
+        AF_exportStatus('Export: downloading page ' + pageNumber +
+            ' (' + downloadedRequests.length + ' records so far)...', '#1a5fd0');
+
+        var response = await fetch(url, {
+            method: "GET",
+            credentials: "include",
+            headers: {
+                Accept: "application/vnd.manageengine.sdp.v3+json",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            cache: "no-store"
+        });
+
+        // Not signed in yet: the API answers 401/403, or the request is
+        // redirected to the HTML login page. Park the export and retry.
+        if (response.status === 401 || response.status === 403) return false;
+        var contentType = response.headers.get('content-type') || '';
+        if (contentType.indexOf('json') === -1) return false;
+
+        if (!response.ok) {
+            var body = await response.text();
+            throw new Error('ServiceDesk returned HTTP ' + response.status + '.\n' + body);
+        }
+
+        var data = await response.json();
+        var pageRequests = Array.isArray(data.requests) ? data.requests : [];
+
+        if (pageRequests.length === 0) {
+            console.log('[AF] No additional requests were returned.');
+            break;
+        }
+
+        downloadedRequests.push.apply(downloadedRequests, pageRequests);
+
+        var timestamps = pageRequests
+            .map(function(request) { return Number(request.created_time && request.created_time.value); })
+            .filter(Number.isFinite);
+        var oldestTimestamp = timestamps.length ? Math.min.apply(null, timestamps) : null;
+        var hasMoreRows = !!(data.list_info && data.list_info.has_more_rows === true);
+
+        console.log('[AF] Page ' + pageNumber + ': ' + pageRequests.length +
+            ' records. Total downloaded: ' + downloadedRequests.length + '.');
+
+        if (oldestTimestamp !== null && oldestTimestamp < startMs) {
+            console.log('[AF] Reached tickets older than the requested workday.');
+            shouldContinue = false;
+        } else if (!hasMoreRows) {
+            console.log('[AF] ServiceDesk reports no additional rows.');
+            shouldContinue = false;
+        } else {
+            startIndex += CONFIG.pageSize;
+            pageNumber += 1;
+        }
+    }
+
+    var requestsForWorkday = downloadedRequests.filter(function(request) {
+        var timestamp = Number(request.created_time && request.created_time.value);
+        return Number.isFinite(timestamp) && timestamp >= startMs && timestamp < endMs;
+    });
+
+    requestsForWorkday.sort(function(a, b) {
+        return Number(a.created_time && a.created_time.value) -
+               Number(b.created_time && b.created_time.value);
+    });
+
+    var output = {
+        export_metadata: {
+            generated_at: new Date().toISOString(),
+            source: location.origin,
+            endpoint: "/api/v3/requests",
+            filter_id: CONFIG.filterId,
+            selected_date: selectedDate,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            workday_start: rangeStart.toISOString(),
+            workday_end_exclusive: rangeEnd.toISOString(),
+            downloaded_record_count: downloadedRequests.length,
+            matching_record_count: requestsForWorkday.length
+        },
+        requests: requestsForWorkday
+    };
+
+    var json = JSON.stringify(output, null, 2);
+    var blob = new Blob([json], { type: "application/json;charset=utf-8" });
+    var downloadUrl = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = 'servicedesk-' + selectedDate + '-' + startHour + '-' + endHour + '.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function() { URL.revokeObjectURL(downloadUrl); }, 1000);
+
+    console.log('[AF] Finished. Exported ' + requestsForWorkday.length + ' tickets.', output);
+    AF_exportStatus('Export complete: ' + requestsForWorkday.length + ' tickets for ' +
+        selectedDate + ', ' + startHour + ':00-' + endHour + ':00.', '#15803d');
+    return true;
+}
+
+function AF_exportPump() {
+    var raw = sessionStorage.getItem(AF_EXPORT_KEY);
+    if (!raw || AF_exportRunning) return;
+
+    var params;
+    try { params = JSON.parse(raw); } catch (e) {
+        sessionStorage.removeItem(AF_EXPORT_KEY);
+        return;
+    }
+
+    AF_exportRunning = true;
+    AF_runDayExport(params).then(function(finished) {
+        AF_exportRunning = false;
+        if (finished) {
+            sessionStorage.removeItem(AF_EXPORT_KEY);
+        } else {
+            AF_exportStatus('Export queued - sign in to ServiceDesk and it will run automatically.', '#d97706');
+            setTimeout(AF_exportPump, 10000);
+        }
+    }).catch(function(error) {
+        AF_exportRunning = false;
+        sessionStorage.removeItem(AF_EXPORT_KEY);
+        console.error('[AF] ServiceDesk export failed:', error);
+        AF_exportStatus('Export failed: ' + error.message, '#dc2626');
+    });
 }
 
 // ====================================================================
 // INIT
 // ====================================================================
 AF_createHUD();
+AF_captureExportRequest();
+setTimeout(AF_exportPump, 1500);
 console.log('[AF] Focus-map autofill ready. Load JSON and tab through the form.');
