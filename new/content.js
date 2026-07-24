@@ -679,7 +679,25 @@ function AF_exportPump() {
 // ====================================================================
 // INIT
 // ====================================================================
-AF_createHUD();
+// Capture the export instruction immediately. ServiceDesk is a hash-routed
+// app and may rewrite location.hash before a document_idle script can read it.
 AF_captureExportRequest();
+
+// The manifest runs this script at document_start so the hash is safe, but
+// the HUD needs document.body. Initialize only the UI when the DOM is ready.
+function AF_startUI() {
+    if (!document.body) {
+        setTimeout(AF_startUI, 50);
+        return;
+    }
+    AF_createHUD();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', AF_startUI, { once: true });
+} else {
+    AF_startUI();
+}
+
 setTimeout(AF_exportPump, 1500);
 console.log('[AF] Focus-map autofill ready. Load JSON and tab through the form.');
