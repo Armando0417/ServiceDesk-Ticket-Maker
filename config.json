@@ -1,0 +1,63 @@
+{
+    "technician": "Armando",
+
+    "quickActions": {
+        "reset":  "Password Reset",
+        "unlock": "Account Unlock",
+        "okta":   "Okta Unpair"
+    },
+
+    "dropdowns": {
+        "ticketType":   ["Incident", "Request"],
+        "status":       ["Open", "closed", "Onhold"],
+        "locationArea": [
+            "Remoto", 
+            "New Port 2 Piso 1",
+            "New Port 2 Piso 2",
+            "New Port 2 Piso 3",
+            "Kennedy Piso 1",
+            "Kennedy Piso 2",
+            "Kennedy Piso 3",
+            "Kennedy Piso 4",
+            "Kennedy Piso 5"
+            ] ,
+        "closureCode":  ["Success", "Unable to Reproduce"]
+    },
+
+    "fields": {
+        "ticket": [
+            { "id": "txtName",     "label": "Name",           "type": "text",   "placeholder": "Display name" },
+            { "id": "txtUser",     "label": "Username",       "type": "text",   "placeholder": "sAMAccountName" },
+            { "id": "txtDept",     "label": "Department",     "type": "text" },
+            { "id": "txtLocation", "label": "Location",       "type": "text" },
+            { "id": "txtContact",  "label": "Contact Number", "type": "text",   "placeholder": "7871234567" },
+            { "id": "txtEmail",    "label": "Email",          "type": "text" },
+            { "id": "txtTopic",    "label": "Topic",          "type": "text" },
+            { "id": "txtTechnician","label": "Technician",    "type": "text" }
+        ],
+        "request": [
+            { "id": "txtReqName", "label": "Name",     "type": "text" },
+            { "id": "txtReqUser", "label": "Username", "type": "text" },
+            { "id": "txtReqOkta", "label": "Okta ID",  "type": "text" }
+        ]
+    },
+
+    "adProperties": [
+        "DisplayName", "SamAccountName", "mail", "Department",
+        "Office", "physicalDeliveryOfficeName",
+        "oktaUser", "Description",
+        "homePhone", "pager", "mobile",
+        "facsimileTelephoneNumber", "ipPhone",
+        "inactivityStatus"
+    ],
+
+    "adMapping": {
+        "DisplayName":       "txtName",
+        "SamAccountName":    "txtUser",
+        "mail":              "txtEmail",
+        "Department":        "txtDept",
+        "Office":            "txtLocation",
+        "oktaUser":          "txtReqOkta"
+    }
+}
+

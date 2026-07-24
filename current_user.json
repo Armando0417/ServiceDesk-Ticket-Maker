@@ -1,0 +1,22 @@
+{
+  "name": "Carmen I Velazquez Laboy",
+  "user": "cvelazquezla",
+  "department": "Clinics Ops and Support Exps CSS",
+  "location": "Caguas MA",
+  "contact": "(939) 588-0644",
+  "email": "Carmen.Velazquez-Laboy@mmm-multiclinica.com",
+  "topic": "Error [Password Reset] - Usuario (East3\\cvelazquez | cvelazquezla) requiere cambio de password a ambos passwords de NextGen",
+  "topic_raw": "Password Reset",
+  "subject": "Error [Password Reset] - Usuario (East3\\cvelazquez | cvelazquezla) requiere cambio de password a ambos passwords de NextGen",
+  "situation": "Usuario (East3\\cvelazquez | cvelazquezla) requiere cambio de password a ambos passwords de NextGen",
+  "process": "Se procedio a realizarle ambos cambios y se le proveyeron al usuario en llamada",
+  "ticket_type": "Incident",
+  "full_block": "Detalles:\n---\nNombre: Carmen I Velazquez Laboy\nusername: cvelazquezla\ndepartamento: Clinics Ops and Support Exps CSS\nlocalidad: Caguas MA\nnumero de contacto: (939) 588-0644\ncorreo: Carmen.Velazquez-Laboy@mmm-multiclinica.com\n\n---\n\nSituacion:\nError [Password Reset] - Usuario (East3\\cvelazquez | cvelazquezla) requiere cambio de password a ambos passwords de NextGen\n\n---\nProceso:\nSe procedio a realizarle ambos cambios y se le proveyeron al usuario en llamada",
+  "_email": "Carmen.Velazquez-Laboy@mmm-multiclinica.com",
+  "_technician": "Armando",
+  "_status": "closed",
+  "_locationArea": "Remoto",
+  "_closureCode": "Success",
+  "_category": "Applications",
+  "_subcategory": "Password Reset"
+}

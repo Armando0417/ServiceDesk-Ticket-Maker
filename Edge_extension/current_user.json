@@ -1,0 +1,23 @@
+{
+  "name": "Joel A Ortiz Fernandez",
+  "user": "joortiz",
+  "department": "MA Sales Field Sales",
+  "location": "Remoto",
+  "contact": "(787) 644-1736",
+  "email": "Joel.Ortiz@mmmhc.com",
+  "topic": "Error [Account Unlock] - Usuario tiene su cuenta de AD bloqueada",
+  "topic_raw": "Account Unlock",
+  "subject": "Error [Account Unlock] - Usuario tiene su cuenta de AD bloqueada",
+  "situation": "Usuario tiene su cuenta de AD bloqueada",
+  "process": "Se le realizo unlock atraves de lockoutstatus y luego atraves de AD para resolver el problema",
+  "ticket_type": "Incident",
+  "full_block": "Detalles:\r\n---\r\nNombre: Joel A Ortiz Fernandez\r\nusername: joortiz\r\ndepartamento: MA Sales Field Sales\r\nlocalidad: Remoto\r\nnumero de contacto: (787) 644-1736\r\ncorreo: Joel.Ortiz@mmmhc.com\r\n\r\n---\r\n\r\nSituacion:\r\nError [Account Unlock] - Usuario tiene su cuenta de AD bloqueada\r\n\r\n---\r\nProceso:\r\nSe le realizo unlock atraves de lockoutstatus y luego atraves de AD para resolver el problema",
+  "_email": "Joel.Ortiz@mmmhc.com",
+  "_technician": "Armando",
+  "_status": "closed",
+  "_locationArea": "Remoto",
+  "_closureCode": "Success",
+  "_category": "User Administration",
+  "_subcategory": "Active Directory",
+  "_item": "Locked Account"
+}

@@ -1,0 +1,552 @@
+# ============================================================================
+#  Ticket Generator — Local Server (v2.0)
+#
+#  Routes:
+#    GET  /              → serves web/index.html
+#    GET  /web/*         → serves static files
+#    GET  /api/config    → sends ALL config to the frontend (single source of truth)
+#    GET  /api/ad        → AD lookup
+#    POST /api/clipboard → copies text to clipboard
+#    POST /api/save      → writes ticket JSON to current_user.json
+#
+#  Bound to 127.0.0.1 ONLY. Nothing leaves this machine.
+# ============================================================================
+
+
+# ── Dependencies ───────────────────────────────────────────────────────────
+Add-Type -AssemblyName System.Windows.Forms
+
+
+# ── Paths ──────────────────────────────────────────────────────────────────
+$BaseDir = if ($PSScriptRoot) { $PSScriptRoot }
+           elseif ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path }
+           else { (Get-Location).Path }
+
+$WebDir          = Join-Path $BaseDir 'web'
+$ConfigFile      = Join-Path $BaseDir 'config.json'
+$TemplateFile    = Join-Path $BaseDir 'block_template.txt'
+$TemplateMapFile = Join-Path $BaseDir 'templates.json'
+$OutputFile      = Join-Path $BaseDir 'current_user.json'
+
+$Port   = 8080
+$Origin = "http://127.0.0.1:$Port"
+
+
+# ============================================================================
+#  DEFAULTS
+#  — Used when config.json or templates.json don't exist.
+#  — To customize, edit config.json. Don't touch these.
+# ============================================================================
+
+$DefaultConfig = @{
+    technician         = ''
+    quickRequestSuffix = ' (Elevance)'
+    quickActions = [ordered]@{
+        reset  = 'Password Reset (Elevance)'
+        unlock = 'Account Unlock'
+        okta   = 'Okta Unpair'
+    }
+    dropdowns = [ordered]@{
+        ticketType   = @{ label = 'Ticket Type';   outputKey = 'ticket_type';   options = @('Incident', 'Request') }
+        status       = @{ label = 'Status';        outputKey = '_status';       options = @('Open', 'closed', 'Onhold') }
+        locationArea = @{ label = 'Location Area'; outputKey = '_locationArea'; options = @('Remoto', 'Presencial') }
+        closureCode  = @{ label = 'Closure Code';  outputKey = '_closureCode';  options = @('Success', 'Unable to Reproduce') }
+    }
+    fields = @{
+        ticket = @(
+            @{ id = 'txtName';     label = 'Name';           type = 'text'; placeholder = 'Display name' }
+            @{ id = 'txtUser';     label = 'Username';       type = 'text'; placeholder = 'sAMAccountName' }
+            @{ id = 'txtDept';     label = 'Department';     type = 'text' }
+            @{ id = 'txtLocation'; label = 'Location';       type = 'text' }
+            @{ id = 'txtContact';  label = 'Contact Number'; type = 'text'; placeholder = '7871234567' }
+            @{ id = 'txtEmail';    label = 'Email';          type = 'text' }
+            @{ id = 'txtTopic';    label = 'Topic';          type = 'text' }
+            @{ id = 'txtTechnician'; label = 'Technician';   type = 'text' }
+        )
+        request = @(
+            @{ id = 'txtReqName'; label = 'Name';     type = 'text' }
+            @{ id = 'txtReqUser'; label = 'Username'; type = 'text' }
+            @{ id = 'txtReqOkta'; label = 'Okta ID';  type = 'text' }
+        )
+    }
+    adProperties = @(
+        'DisplayName', 'SamAccountName', 'mail', 'Department',
+        'Office', 'physicalDeliveryOfficeName',
+        'oktaUser', 'Description',
+        'homePhone', 'pager', 'mobile',
+        'facsimileTelephoneNumber', 'ipPhone',
+        'inactivityStatus'
+    )
+    adMapping = @{
+        DisplayName    = 'txtName'
+        SamAccountName = 'txtUser'
+        mail           = 'txtEmail'
+        Department     = 'txtDept'
+        Office         = 'txtLocation'
+        oktaUser       = 'txtReqOkta'
+    }
+}
+
+$DefaultBlockTemplate = @"
+Detalles:
+---
+Nombre: {{name}}
+username: {{user}}
+departamento: {{department}}
+localidad: {{location}}
+numero de contacto: {{contact}}
+correo: {{email}}
+
+---
+
+Situacion:
+{{subject}}
+
+---
+Proceso:
+{{process}}
+"@
+
+$DefaultTemplateMap = [ordered]@{
+    'Password Reset'  = @{ Category = 'Applications';        Subcategory = 'Password Reset';   Item = '' }
+    'Account Unlock'  = @{ Category = 'User Administration'; Subcategory = 'Active Directory'; Item = 'Locked Account' }
+    'Orientation Call' = @{ Category = 'User Administration'; Subcategory = 'Orientation Call'; Item = '' }
+    'Hardware Issues'  = @{ Category = 'Hardware';            Subcategory = 'Laptop';           Item = '' }
+    'Error 58tm1'      = @{ Category = 'Applications';        Subcategory = 'Microsoft Apps';  Item = '' }
+}
+
+
+# ============================================================================
+#  LOADERS
+# ============================================================================
+
+# Turn a raw dropdowns blob into a consistent shape:
+#   key = @{ label = '...'; outputKey = '...'; options = @(...) }
+#
+# Accepts two forms so old configs keep working:
+#   "status": ["Open", "closed"]                     <- legacy array
+#   "status": { label, outputKey, options: [...] }   <- current
+#
+# Missing label     -> falls back to the key name
+# Missing outputKey -> '_' + key  (matches the original _status/_closureCode convention)
+function Normalize-Dropdowns($raw) {
+    $out = [ordered]@{}
+    if ($null -eq $raw) { return $out }
+
+    foreach ($entry in $raw.PSObject.Properties) {
+        $key = $entry.Name
+        $val = $entry.Value
+
+        # ticketType is special: it renders in the Preset card and has always
+        # emitted as 'ticket_type' (no underscore prefix). Pin its default so
+        # a legacy array-form config doesn't silently become '_ticketType'.
+        $defaultOut = if ($key -eq 'ticketType') { 'ticket_type' } else { "_$key" }
+
+        # Legacy: bare array of option strings
+        if ($val -is [System.Array]) {
+            $out[$key] = @{
+                label     = $key
+                outputKey = $defaultOut
+                options   = @($val)
+            }
+            continue
+        }
+
+        # Current: object with options
+        $label     = if ($val.label)     { [string]$val.label }     else { $key }
+        $outputKey = if ($val.outputKey) { [string]$val.outputKey } else { $defaultOut }
+        $options   = if ($val.options)   { @($val.options) }        else { @() }
+
+        $out[$key] = @{
+            label     = $label
+            outputKey = $outputKey
+            options   = $options
+        }
+    }
+    return $out
+}
+
+function Load-Config {
+    if (-not (Test-Path $ConfigFile)) { return $DefaultConfig }
+    try {
+        $raw = Get-Content -Path $ConfigFile -Raw | ConvertFrom-Json -ErrorAction Stop
+
+        # Merge with defaults — anything missing in config.json falls back
+        $cfg = $DefaultConfig.Clone()
+        if ($null -ne $raw.technician)         { $cfg.technician         = [string]$raw.technician }
+        if ($null -ne $raw.quickRequestSuffix) { $cfg.quickRequestSuffix = [string]$raw.quickRequestSuffix }
+        if ($null -ne $raw.quickActions)  { $cfg.quickActions  = $raw.quickActions }
+        if ($null -ne $raw.dropdowns)     { $cfg.dropdowns     = Normalize-Dropdowns $raw.dropdowns }
+        if ($null -ne $raw.fields)        { $cfg.fields        = $raw.fields }
+        if ($null -ne $raw.adProperties)  { $cfg.adProperties  = @($raw.adProperties) }
+        if ($null -ne $raw.adMapping)     { $cfg.adMapping     = $raw.adMapping }
+        return $cfg
+    } catch {
+        Write-Host "  [warn] Could not parse config.json, using defaults." -ForegroundColor Yellow
+        return $DefaultConfig
+    }
+}
+
+function Load-BlockTemplate {
+    if (Test-Path $TemplateFile) { return (Get-Content $TemplateFile -Raw) }
+    return $DefaultBlockTemplate
+}
+
+function Load-TemplateMap {
+    if (-not (Test-Path $TemplateMapFile)) { return $DefaultTemplateMap }
+    try {
+        $raw = Get-Content -Path $TemplateMapFile -Raw | ConvertFrom-Json -ErrorAction Stop
+        $map = [ordered]@{}
+        foreach ($entry in $raw.PSObject.Properties) {
+            $v = $entry.Value
+            $map[$entry.Name] = @{
+                Category    = if ($v.Category)    { [string]$v.Category }    else { '' }
+                Subcategory = if ($v.Subcategory) { [string]$v.Subcategory } else { '' }
+                Item        = if ($v.Item)        { [string]$v.Item }
+                              elseif ($v.item)    { [string]$v.item }
+                              else { '' }
+            }
+        }
+        return $map
+    } catch {
+        return $DefaultTemplateMap
+    }
+}
+
+# Load once at startup
+$Config        = Load-Config
+$BlockTemplate = Load-BlockTemplate
+$TemplateMap   = Load-TemplateMap
+
+Write-Host ""
+Write-Host "  Config loaded." -ForegroundColor DarkGray
+Write-Host "    Technician:    $( if ($Config.technician) { $Config.technician } else { '(not set)' } )" -ForegroundColor DarkGray
+
+
+# ============================================================================
+#  UTILITIES
+# ============================================================================
+
+function Escape-FilterValue([string]$Value) {
+    if ($null -eq $Value) { return '' }
+    return $Value.Replace("'", "''")
+}
+
+
+# ============================================================================
+#  AD LOOKUP
+#  — Properties to fetch come from config.adProperties
+#  — Field mapping comes from config.adMapping
+# ============================================================================
+
+function Invoke-ADLookup([string]$QueryUser, [string]$QueryName) {
+    if (-not $QueryUser -and -not $QueryName) {
+        return @{ ok = $false; error = 'Provide a username or name to search.' }
+    }
+
+    try { Import-Module ActiveDirectory -ErrorAction Stop }
+    catch { return @{ ok = $false; error = 'ActiveDirectory module is not available.' } }
+
+    # Pull the property list from config
+    $props = @($Config.adProperties)
+
+    try {
+        $user = $null
+
+        if ($QueryUser) {
+            try {
+                $user = Get-ADUser -Identity $QueryUser -Properties $props -ErrorAction Stop
+            } catch {
+                $safe = Escape-FilterValue $QueryUser
+                $user = Get-ADUser -Filter "SamAccountName -eq '$safe' -or UserPrincipalName -like '$safe*'" `
+                        -Properties $props | Select-Object -First 1
+            }
+        }
+
+        if (-not $user -and $QueryName) {
+            $safe = Escape-FilterValue $QueryName
+            $user = Get-ADUser -Filter "Name -like '*$safe*' -or DisplayName -like '*$safe*'" `
+                    -Properties $props | Select-Object -First 1
+        }
+
+        if (-not $user) {
+            return @{ ok = $false; error = 'No matching AD user found.' }
+        }
+
+        # Build result: return every requested property that has a value
+        $result = @{ ok = $true }
+        foreach ($prop in $props) {
+            $val = $user.$prop
+            if ($val) { $result[$prop] = [string]$val }
+        }
+
+        # Also return the field mapping so the frontend knows where to put each value
+        $result['_mapping'] = $Config.adMapping
+
+        return $result
+    } catch {
+        return @{ ok = $false; error = "AD lookup failed: $($_.Exception.Message)" }
+    }
+}
+
+
+# ============================================================================
+#  CLIPBOARD
+# ============================================================================
+
+function Set-Clipboard-Text([string]$Text) {
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return @{ ok = $false; error = 'Nothing to copy.' }
+    }
+    try {
+        [System.Windows.Forms.Clipboard]::SetText($Text)
+        return @{ ok = $true }
+    } catch {
+        return @{ ok = $false; error = "Clipboard failed: $($_.Exception.Message)" }
+    }
+}
+
+
+# ============================================================================
+#  HTTP HELPERS
+# ============================================================================
+
+function Send-Json($response, [hashtable]$data, [int]$status = 200) {
+    try {
+        $json   = $data | ConvertTo-Json -Depth 10
+        $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+        $response.StatusCode       = $status
+        $response.ContentType      = 'application/json; charset=utf-8'
+        $response.Headers.Add('Access-Control-Allow-Origin', $Origin)
+        $response.ContentLength64  = $buffer.Length
+        $response.OutputStream.Write($buffer, 0, $buffer.Length)
+    } catch {
+        # Client hung up mid-write. Not fatal — don't take the request loop down.
+    } finally {
+        try { $response.Close() } catch { }
+    }
+}
+
+function Send-Text($response, [string]$text, [string]$contentType = 'text/plain', [int]$status = 200) {
+    try {
+        $buffer = [System.Text.Encoding]::UTF8.GetBytes($text)
+        $response.StatusCode       = $status
+        $response.ContentType      = "$contentType; charset=utf-8"
+        $response.ContentLength64  = $buffer.Length
+        $response.OutputStream.Write($buffer, 0, $buffer.Length)
+    } catch {
+        # Client hung up mid-write.
+    } finally {
+        try { $response.Close() } catch { }
+    }
+}
+
+function Send-File($response, [string]$filePath) {
+    if (-not (Test-Path $filePath)) {
+        # Send-Text closes the response itself — return immediately so we
+        # don't fall through and try to close it a second time.
+        Send-Text $response '404 Not Found' 'text/plain' 404
+        return
+    }
+    try {
+        $ext  = [System.IO.Path]::GetExtension($filePath).ToLower()
+        $mime = @{
+            '.html' = 'text/html';       '.css'  = 'text/css'
+            '.js'   = 'application/javascript'; '.json' = 'application/json'
+            '.png'  = 'image/png';       '.svg'  = 'image/svg+xml'
+            '.ico'  = 'image/x-icon'
+        }
+        $type  = if ($mime.ContainsKey($ext)) { $mime[$ext] } else { 'application/octet-stream' }
+        $bytes = [System.IO.File]::ReadAllBytes($filePath)
+        $response.StatusCode       = 200
+        $response.ContentType      = $type
+        $response.ContentLength64  = $bytes.Length
+        $response.OutputStream.Write($bytes, 0, $bytes.Length)
+    } catch {
+        # Client hung up mid-write, or the file vanished between the
+        # Test-Path check and the read.
+    } finally {
+        try { $response.Close() } catch { }
+    }
+}
+
+function Read-RequestBody($request) {
+    $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
+    $body   = $reader.ReadToEnd()
+    $reader.Close()
+    return $body
+}
+
+
+# ============================================================================
+#  SECURITY TOKEN
+# ============================================================================
+
+$Token = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
+
+function Check-Token($request) {
+    $q = $request.QueryString['token']
+    $h = $request.Headers['X-Token']
+    return (($q -eq $Token) -or ($h -eq $Token))
+}
+
+
+# ============================================================================
+#  ROUTE HANDLER
+# ============================================================================
+
+function Handle-Request($context) {
+    $req    = $context.Request
+    $res    = $context.Response
+    $path   = $req.Url.AbsolutePath
+    $method = $req.HttpMethod
+
+    Write-Host "  $method $path" -ForegroundColor DarkGray
+
+    # ── Root ───────────────────────────────────────────────────────────
+    if ($path -eq '/' -or $path -eq '/index.html') {
+        Send-File $res (Join-Path $WebDir 'index.html')
+        return
+    }
+
+    # ── Static files (/web/*) ──────────────────────────────────────────
+    if ($path.StartsWith('/web/')) {
+        $relative = $path.Substring(5)
+        if ($relative.Contains('..')) { Send-Text $res '403' 'text/plain' 403; return }
+        Send-File $res (Join-Path $WebDir $relative)
+        return
+    }
+
+    # ── Favicon — answer BEFORE the token gate ─────────────────────────
+    #    The browser requests /favicon.ico on its own, with no token.
+    #    If it falls through to the 403 path it interleaves with in-flight
+    #    API responses on this single-threaded listener and tears down the
+    #    response stream mid-read (shows up client-side as a
+    #    ReadableStreamDefaultController close error).
+    #    204 No Content, empty body — the browser stops asking.
+    if ($path -eq '/favicon.ico') {
+        try {
+            $res.StatusCode      = 204
+            $res.ContentLength64 = 0
+        } catch { } finally {
+            try { $res.Close() } catch { }
+        }
+        return
+    }
+
+    # ── Token gate — everything below requires auth ────────────────────
+    if (-not (Check-Token $req)) {
+        Send-Json $res @{ ok = $false; error = 'Invalid or missing token.' } 403
+        return
+    }
+
+    # ── GET /api/config ────────────────────────────────────────────────
+    #    The frontend's single source of truth.
+    #    Everything the UI needs to build itself lives here.
+    if ($path -eq '/api/config' -and $method -eq 'GET') {
+        # Re-read from disk so edits to config.json / templates.json /
+        # block_template.txt take effect on a browser refresh (F5).
+        # No server restart needed.
+        #
+        # $script: scope matters here — without it these assignments would
+        # create function-local copies and the AD lookup route would keep
+        # using the stale startup config.
+        $script:Config        = Load-Config
+        $script:BlockTemplate = Load-BlockTemplate
+        $script:TemplateMap   = Load-TemplateMap
+        Write-Host "  [config] reloaded from disk" -ForegroundColor DarkGray
+
+        Send-Json $res @{
+            ok                 = $true
+            technician         = $Config.technician
+            quickRequestSuffix = $Config.quickRequestSuffix
+            quickActions       = $Config.quickActions
+            dropdowns     = $Config.dropdowns
+            fields        = $Config.fields
+            adMapping     = $Config.adMapping
+            blockTemplate = $BlockTemplate
+            templateMap   = $TemplateMap
+        }
+        return
+    }
+
+    # ── GET /api/ad?user=xxx  or  ?name=xxx ────────────────────────────
+    if ($path -eq '/api/ad' -and $method -eq 'GET') {
+        $result = Invoke-ADLookup $req.QueryString['user'] $req.QueryString['name']
+        Send-Json $res $result ($(if ($result.ok) { 200 } else { 404 }))
+        return
+    }
+
+    # ── POST /api/clipboard ────────────────────────────────────────────
+    if ($path -eq '/api/clipboard' -and $method -eq 'POST') {
+        $body = Read-RequestBody $req
+        try {
+            $data   = $body | ConvertFrom-Json
+            $result = Set-Clipboard-Text $data.text
+            Send-Json $res $result
+        } catch {
+            Send-Json $res @{ ok = $false; error = 'Invalid request body.' } 400
+        }
+        return
+    }
+
+    # ── POST /api/save ─────────────────────────────────────────────────
+    if ($path -eq '/api/save' -and $method -eq 'POST') {
+        $body = Read-RequestBody $req
+        try {
+            Set-Content -Path $OutputFile -Value $body -Encoding UTF8
+            Send-Json $res @{ ok = $true; path = $OutputFile }
+        } catch {
+            Send-Json $res @{ ok = $false; error = "Save failed: $($_.Exception.Message)" } 500
+        }
+        return
+    }
+
+    # ── 404 ────────────────────────────────────────────────────────────
+    Send-Json $res @{ ok = $false; error = "Unknown route: $path" } 404
+}
+
+
+# ============================================================================
+#  START
+# ============================================================================
+
+$http = New-Object System.Net.HttpListener
+$http.Prefixes.Add("$Origin/")
+$http.Start()
+
+$StartUrl = "$Origin/?token=$Token"
+
+Write-Host ""
+Write-Host "  ============================================" -ForegroundColor DarkYellow
+Write-Host "    Ticket Generator Server v2.1"               -ForegroundColor Yellow
+Write-Host "  ============================================" -ForegroundColor DarkYellow
+Write-Host ""
+Write-Host "  Listening on:  $Origin"  -ForegroundColor Green
+Write-Host "  Token:         $Token"   -ForegroundColor DarkGray
+Write-Host "  Config:        $ConfigFile" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "  Opening browser..." -ForegroundColor DarkGray
+Write-Host "  Press Ctrl+C to stop." -ForegroundColor DarkGray
+Write-Host ""
+
+Start-Process $StartUrl
+
+try {
+    while ($http.IsListening) {
+        # Per-request try/catch: a single malformed or aborted request
+        # should never take down the whole server.
+        try {
+            Handle-Request $http.GetContext()
+        } catch {
+            Write-Host "  [warn] request failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+} catch {
+    Write-Host "`n  Server error: $($_.Exception.Message)" -ForegroundColor Red
+} finally {
+    $http.Stop()
+    $http.Close()
+    Write-Host "  Server stopped." -ForegroundColor Yellow
+}
+

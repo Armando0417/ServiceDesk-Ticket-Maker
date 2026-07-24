@@ -1,0 +1,41 @@
+{
+    "Password Reset": {
+        "Category": "Applications",
+        "Subcategory": "Password Reset",
+        "item": ""
+    },
+    "Account Unlock": {
+        "Category": "User Administration",
+        "Subcategory": "Active Directory",
+        "item": "Locked Account"
+    },
+    
+    "Orientation Call": {
+        "Category": "User Administration",
+        "Subcategory": "Orientation Call"
+    },
+    "Hardware Issues": {
+        "Category": "Hardware",
+        "Subcategory": "Laptop"
+    },
+    "VDI" : {
+        "Category": "Applications",
+        "Subcategory": "Virtual Machine",
+        "item": "XenDesktop"
+    },
+    "58tm1": {
+        "Category": "Applications",
+        "Subcategory": "Microsoft Apps"
+    },
+    "Password Reset Elevance" : {
+        "Category": "Applications",
+        "Subcategory": "Password Reset",
+        "item": "Elevance"
+    },
+    "Password Reset Medhok" : {
+        "Category": "Applications",
+        "Subcategory": "Password Reset",
+        "item": "Medhok"
+    }
+
+}
