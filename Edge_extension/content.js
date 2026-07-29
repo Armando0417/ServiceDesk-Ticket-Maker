@@ -209,20 +209,176 @@ function AF_fillS2(el, value, key, loadId, done) {
     setTimeout(trySearch, 50);
 }
 
+// Convert Markdown authored in the Ticket Generator into a conservative,
+// HTML-safe subset understood by ServiceDesk's rich-text editor.
+function AF_escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function AF_renderMarkdownInline(source) {
+    var codeFragments = [];
+    var text = AF_escapeHtml(source);
+
+    text = text.replace(/`([^`\n]+)`/g, function(_, code) {
+        var token = '@@AF_MD_CODE_' + codeFragments.length + '@@';
+        codeFragments.push('<code>' + code + '</code>');
+        return token;
+    });
+
+    // Only safe explicit schemes become links. Raw HTML and unsafe URLs stay
+    // escaped as visible text.
+    text = text.replace(
+        /\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)/gi,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+    text = text
+        .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/__([^_\n]+)__/g, '<strong>$1</strong>')
+        .replace(/~~([^~\n]+)~~/g, '<del>$1</del>')
+        .replace(/(^|[\s(])\*([^*\n]+)\*(?=$|[\s).,!?:;])/g, '$1<em>$2</em>')
+        .replace(/(^|[\s(])_([^_\n]+)_(?=$|[\s).,!?:;])/g, '$1<em>$2</em>');
+
+    codeFragments.forEach(function(fragment, index) {
+        text = text.replace('@@AF_MD_CODE_' + index + '@@', fragment);
+    });
+    return text;
+}
+
+function AF_markdownBlockKind(line) {
+    if (/^```/.test(line)) return 'fence';
+    if (/^#{1,6}\s+/.test(line)) return 'heading';
+    if (/^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line)) return 'rule';
+    if (/^\s*>\s?/.test(line)) return 'quote';
+    if (/^\s*(?:[-+*]|\d+[.)])\s+/.test(line)) return 'list';
+    return '';
+}
+
+function AF_markdownToHtml(source) {
+    var markdown = String(source || '').replace(/\r\n?/g, '\n');
+    if (!markdown.trim()) return '';
+
+    var lines = markdown.split('\n');
+    var output = [];
+    var listType = '';
+    function closeList() {
+        if (!listType) return;
+        output.push('</' + listType + '>');
+        listType = '';
+    }
+
+    for (var index = 0; index < lines.length; index++) {
+        var line = lines[index];
+        var fence = line.match(/^```\s*([a-z0-9_-]*)\s*$/i);
+        if (fence) {
+            closeList();
+            var codeLines = [];
+            index++;
+            while (index < lines.length && !/^```\s*$/.test(lines[index])) {
+                codeLines.push(lines[index]);
+                index++;
+            }
+            output.push('<pre><code>' + AF_escapeHtml(codeLines.join('\n')) + '</code></pre>');
+            continue;
+        }
+
+        if (!line.trim()) {
+            closeList();
+            continue;
+        }
+
+        var heading = line.match(/^(#{1,6})\s+(.+)$/);
+        if (heading) {
+            closeList();
+            var level = heading[1].length;
+            output.push('<h' + level + '>' + AF_renderMarkdownInline(heading[2]) + '</h' + level + '>');
+            continue;
+        }
+
+        if (/^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line)) {
+            closeList();
+            output.push('<hr>');
+            continue;
+        }
+
+        if (/^\s*>\s?/.test(line)) {
+            closeList();
+            var quoteLines = [];
+            while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+                quoteLines.push(AF_renderMarkdownInline(lines[index].replace(/^\s*>\s?/, '')));
+                index++;
+            }
+            index--;
+            output.push('<blockquote><p>' + quoteLines.join('<br>') + '</p></blockquote>');
+            continue;
+        }
+
+        var listItem = line.match(/^\s*([-+*]|\d+[.)])\s+(.+)$/);
+        if (listItem) {
+            var nextListType = /^\d/.test(listItem[1]) ? 'ol' : 'ul';
+            if (listType !== nextListType) {
+                closeList();
+                listType = nextListType;
+                output.push('<' + listType + '>');
+            }
+
+            var task = listItem[2].match(/^\[([ xX])\]\s+(.*)$/);
+            if (task) {
+                var checked = task[1].toLowerCase() === 'x' ? ' checked' : '';
+                output.push(
+                    '<li><input type="checkbox" disabled' + checked + '> ' +
+                    AF_renderMarkdownInline(task[2]) + '</li>'
+                );
+            } else {
+                output.push('<li>' + AF_renderMarkdownInline(listItem[2]) + '</li>');
+            }
+            continue;
+        }
+
+        closeList();
+        var paragraph = [line.trim()];
+        while (
+            index + 1 < lines.length &&
+            lines[index + 1].trim() &&
+            !AF_markdownBlockKind(lines[index + 1])
+        ) {
+            paragraph.push(lines[++index].trim());
+        }
+        output.push(
+            '<p>' + paragraph.map(AF_renderMarkdownInline).join('<br>') + '</p>'
+        );
+    }
+
+    closeList();
+    return output.join('');
+}
+
+function AF_setRichContent(iframe, wrapper, value) {
+    if (!iframe || !iframe.contentDocument || !iframe.contentDocument.body) return false;
+
+    var html = AF_markdownToHtml(value);
+    var body = iframe.contentDocument.body;
+    body.innerHTML = html;
+    body.dispatchEvent(new Event('input', { bubbles: true }));
+    body.dispatchEvent(new Event('change', { bubbles: true }));
+
+    var ta = wrapper ? wrapper.querySelector('textarea') : null;
+    if (ta) {
+        ta.value = html;
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        ta.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    return true;
+}
+
 function AF_fillRich(el, value) {
     var wrapper = el.closest('.sdp-zeditor-ovwrt') || el.closest('.control-holder') || el.parentElement;
     var iframe = wrapper ? wrapper.querySelector('iframe.ze_area') : null;
-    if (iframe && iframe.contentDocument && iframe.contentDocument.body) {
-        var html = value.replace(/\r\n/g, '\n').replace(/\n/g, '<br>');
-        iframe.contentDocument.body.innerHTML = html;
-        var ta = wrapper.querySelector('textarea');
-        if (ta) {
-            ta.value = html;
-            ta.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        return true;
-    }
-    return false;
+    return AF_setRichContent(iframe, wrapper, value);
 }
 
 function AF_fillTA(el, value) {
@@ -321,10 +477,7 @@ function AF_hookIframes() {
                 var value = m.val(AF_data);
                 if (!value) return;
 
-                var html = value.replace(/\r\n/g, '\n').replace(/\n/g, '<br>');
-                iDoc.body.innerHTML = html;
-                var ta = ed.querySelector('textarea');
-                if (ta) { ta.value = html; ta.dispatchEvent(new Event('input', { bubbles: true })); }
+                if (!AF_setRichContent(iframe, ed, value)) return;
                 AF_filled[key] = true;
                 AF_updateHUD();
                 console.log('[AF] Filled richtext:', key);

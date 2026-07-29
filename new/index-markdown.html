@@ -1071,7 +1071,7 @@ select option { background: var(--bg); color: var(--text); }
         <div id="tab-editor" class="panel">
             <div class="page-header">
                 <h2>Template Editor</h2>
-                <div class="desc">Customize the plain-text output block. Click a token to insert it at cursor.</div>
+                <div class="desc">Customize the Markdown output block. Click a token to insert it at the cursor; the preview renders formatting live.</div>
             </div>
             <div class="card">
                 <div class="card-title">Available Tokens</div>
@@ -1086,8 +1086,8 @@ select option { background: var(--bg); color: var(--text); }
                 </div>
             </div>
             <div class="card">
-                <div class="card-title">Live Preview</div>
-                <div class="output-box" id="previewBox" style="min-height:180px"></div>
+                <div class="card-title">Rendered Markdown Preview</div>
+                <div class="markdown-preview" id="previewBox" style="min-height:180px"></div>
             </div>
         </div>
 
@@ -1966,8 +1966,11 @@ function buildSample() {
 }
 
 function updatePreview() {
-    byId('previewBox').textContent =
-        expandTemplate(byId('templateEditor').value || CFG.blockTemplate, buildSample());
+    const markdown = expandTemplate(
+        byId('templateEditor').value || CFG.blockTemplate,
+        buildSample()
+    );
+    byId('previewBox').innerHTML = renderProcessMarkdown(markdown);
 }
 
 byId('templateEditor').addEventListener('input', updatePreview);
