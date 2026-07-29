@@ -16,7 +16,6 @@
         "Subcategory": "Active Directory",
         "item": "Locked Account"
     },
-    
     "Orientation Call": {
         "Category": "User Administration",
         "Subcategory": "Orientation Call"
@@ -25,7 +24,7 @@
         "Category": "Hardware",
         "Subcategory": "Laptop"
     },
-    "VDI" : {
+    "VDI": {
         "Category": "Applications",
         "Subcategory": "Virtual Machine",
         "item": "XenDesktop"
@@ -34,7 +33,7 @@
         "Category": "Applications",
         "Subcategory": "Microsoft Apps"
     },
-    "Password Reset Elevance" : {
+    "Password Reset Elevance": {
         "Category": "Applications",
         "Subcategory": "Password Reset",
         "item": "Elevance",
@@ -46,7 +45,7 @@
             "platform": "Elevance"
         }
     },
-    "Password Reset Medhok" : {
+    "Password Reset Medhok": {
         "Category": "Applications",
         "Subcategory": "Password Reset",
         "item": "Medhok",
@@ -58,5 +57,4 @@
             "platform": "Medhok"
         }
     }
-
 }

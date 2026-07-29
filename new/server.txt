@@ -3,10 +3,12 @@
 #
 #  Routes:
 #    GET  /              → serves web/index.html
+#    GET  /markdown      → serves the separate Markdown-enabled shell
 #    GET  /web/*         → serves static files
 #    GET  /api/config    → sends ALL config to the frontend (single source of truth)
 #    GET  /api/ad        → AD lookup
 #    POST /api/clipboard → copies text to clipboard
+#    POST /api/template  → persists the plain-text output template
 #
 #  Bound to 127.0.0.1 ONLY. Nothing leaves this machine.
 # ============================================================================
@@ -14,6 +16,12 @@
 
 # ── Dependencies ───────────────────────────────────────────────────────────
 Add-Type -AssemblyName System.Windows.Forms
+
+# ── Force UTF-8 everywhere in the console (fixes mangled unicode in Write-Host) ──
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch {}
 
 
 # ── Paths ──────────────────────────────────────────────────────────────────
@@ -106,7 +114,16 @@ Proceso:
 "@
 
 $DefaultTemplateMap = [ordered]@{
-    'Password Reset'  = @{ Category = 'Applications';        Subcategory = 'Password Reset';   Item = '' }
+    'Password Reset'  = @{
+        Category          = 'Applications'
+        Subcategory       = 'Password Reset'
+        Item              = ''
+        TicketType        = 'Request'
+        Topic             = 'Password Reset'
+        SituationTemplate = 'Username ({{user}}) asks for a password reset to access {{platform}}.'
+        ProcessTemplate   = 'The password reset was completed, and we successfully validated that the user can access {{platform}}.'
+        Values            = @{ platform = '[PLATFORM]' }
+    }
     'Account Unlock'  = @{ Category = 'User Administration'; Subcategory = 'Active Directory'; Item = 'Locked Account' }
     'Orientation Call' = @{ Category = 'User Administration'; Subcategory = 'Orientation Call'; Item = '' }
     'Hardware Issues'  = @{ Category = 'Hardware';            Subcategory = 'Laptop';           Item = '' }
@@ -167,7 +184,7 @@ function Normalize-Dropdowns($raw) {
 function Load-Config {
     if (-not (Test-Path $ConfigFile)) { return $DefaultConfig }
     try {
-        $raw = Get-Content -Path $ConfigFile -Raw | ConvertFrom-Json -ErrorAction Stop
+        $raw = Get-Content -Path $ConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
 
         # Merge with defaults — anything missing in config.json falls back
         $cfg = $DefaultConfig.Clone()
@@ -186,23 +203,34 @@ function Load-Config {
 }
 
 function Load-BlockTemplate {
-    if (Test-Path $TemplateFile) { return (Get-Content $TemplateFile -Raw) }
+    if (Test-Path $TemplateFile) { return (Get-Content $TemplateFile -Raw -Encoding UTF8) }
     return $DefaultBlockTemplate
 }
 
 function Load-TemplateMap {
     if (-not (Test-Path $TemplateMapFile)) { return $DefaultTemplateMap }
     try {
-        $raw = Get-Content -Path $TemplateMapFile -Raw | ConvertFrom-Json -ErrorAction Stop
+        $raw = Get-Content -Path $TemplateMapFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
         $map = [ordered]@{}
         foreach ($entry in $raw.PSObject.Properties) {
             $v = $entry.Value
+            $values = [ordered]@{}
+            if ($null -ne $v.Values) {
+                foreach ($valueEntry in $v.Values.PSObject.Properties) {
+                    $values[$valueEntry.Name] = [string]$valueEntry.Value
+                }
+            }
             $map[$entry.Name] = @{
-                Category    = if ($v.Category)    { [string]$v.Category }    else { '' }
-                Subcategory = if ($v.Subcategory) { [string]$v.Subcategory } else { '' }
-                Item        = if ($v.Item)        { [string]$v.Item }
-                              elseif ($v.item)    { [string]$v.item }
-                              else { '' }
+                Category          = if ($v.Category)          { [string]$v.Category }          else { '' }
+                Subcategory       = if ($v.Subcategory)       { [string]$v.Subcategory }       else { '' }
+                Item              = if ($v.Item)              { [string]$v.Item }
+                                    elseif ($v.item)          { [string]$v.item }
+                                    else { '' }
+                TicketType        = if ($v.TicketType)        { [string]$v.TicketType }        else { '' }
+                Topic             = if ($v.Topic)             { [string]$v.Topic }             else { '' }
+                SituationTemplate = if ($v.SituationTemplate) { [string]$v.SituationTemplate } else { '' }
+                ProcessTemplate   = if ($v.ProcessTemplate)   { [string]$v.ProcessTemplate }   else { '' }
+                Values            = $values
             }
         }
         return $map
@@ -369,7 +397,13 @@ function Send-File($response, [string]$filePath) {
 }
 
 function Read-RequestBody($request) {
-    $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
+    # NOTE: $request.ContentEncoding is NOT reliable here. HttpListener only
+    # honors a charset if the client's Content-Type header explicitly says
+    # 'charset=utf-8'. Our frontend's fetch() calls just send
+    # 'application/json' with no charset, so .ContentEncoding silently falls
+    # back to the system ANSI codepage — which mangles any unicode symbols
+    # (━ ✦ 🌿 etc.) the instant they're decoded. Force UTF-8 explicitly.
+    $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
     $body   = $reader.ReadToEnd()
     $reader.Close()
     return $body
@@ -404,6 +438,12 @@ function Handle-Request($context) {
     # ── Root ───────────────────────────────────────────────────────────
     if ($path -eq '/' -or $path -eq '/index.html') {
         Send-File $res (Join-Path $WebDir 'index.html')
+        return
+    }
+
+    # ── Markdown shell ─────────────────────────────────────────────────
+    if ($path -eq '/markdown' -or $path -eq '/index-markdown.html') {
+        Send-File $res (Join-Path $WebDir 'index-markdown.html')
         return
     }
 
@@ -475,6 +515,34 @@ function Handle-Request($context) {
         return
     }
 
+    # ── POST /api/template ─────────────────────────────────────────────
+    #    Persists the Template Editor content across refreshes/restarts.
+    if ($path -eq '/api/template' -and $method -eq 'POST') {
+        $body = Read-RequestBody $req
+        try {
+            $data = $body | ConvertFrom-Json -ErrorAction Stop
+            if ($null -eq $data.template) {
+                Send-Json $res @{ ok = $false; error = 'Missing template text.' } 400
+                return
+            }
+
+            $templateText = [string]$data.template
+            if ($templateText.Length -gt 262144) {
+                Send-Json $res @{ ok = $false; error = 'Template is too large.' } 413
+                return
+            }
+
+            $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+            [System.IO.File]::WriteAllText($TemplateFile, $templateText, $utf8NoBom)
+            $script:BlockTemplate = $templateText
+            Send-Json $res @{ ok = $true }
+        } catch {
+            Write-Host "  [warn] Could not save block_template.txt: $($_.Exception.Message)" -ForegroundColor Yellow
+            Send-Json $res @{ ok = $false; error = 'Could not save the template.' } 500
+        }
+        return
+    }
+
     # ── POST /api/clipboard ────────────────────────────────────────────
     if ($path -eq '/api/clipboard' -and $method -eq 'POST') {
         $body = Read-RequestBody $req
@@ -502,6 +570,7 @@ $http.Prefixes.Add("$Origin/")
 $http.Start()
 
 $StartUrl = "$Origin/?token=$Token"
+$MarkdownUrl = "$Origin/markdown?token=$Token"
 
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor DarkYellow
@@ -511,6 +580,8 @@ Write-Host ""
 Write-Host "  Listening on:  $Origin"  -ForegroundColor Green
 Write-Host "  Token:         $Token"   -ForegroundColor DarkGray
 Write-Host "  Config:        $ConfigFile" -ForegroundColor DarkGray
+Write-Host "  Standard UI:   $StartUrl" -ForegroundColor DarkGray
+Write-Host "  Markdown UI:   $MarkdownUrl" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Opening browser..." -ForegroundColor DarkGray
 Write-Host "  Press Ctrl+C to stop." -ForegroundColor DarkGray
@@ -535,4 +606,3 @@ try {
     $http.Close()
     Write-Host "  Server stopped." -ForegroundColor Yellow
 }
-

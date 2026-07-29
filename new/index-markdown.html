@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ticket Generator v2.1</title>
+<title>Ticket Generator v2.1 — Markdown Shell</title>
 <style>
 :root {
     /* Surfaces */
@@ -766,10 +766,170 @@ select option { background: var(--bg); color: var(--text); }
     border: 1px solid var(--border);
 }
 
+/* Markdown process editor */
+.markdown-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 18px;
+    align-items: stretch;
+}
+
+.markdown-source,
+.markdown-preview-panel {
+    min-width: 0;
+}
+
+.markdown-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--bg-subtle);
+}
+
+.md-tool {
+    min-height: 30px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-xs);
+    background: var(--bg);
+    color: var(--text-mid);
+    font-family: var(--body);
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+    box-shadow: var(--shadow-xs);
+    transition: color var(--ease), border-color var(--ease), background var(--ease);
+}
+
+.md-tool:hover {
+    color: var(--accent-deep);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+#txtProcess {
+    min-height: 260px;
+    font-family: var(--mono);
+    font-size: 13px;
+    tab-size: 4;
+}
+
+.markdown-preview-label {
+    color: var(--text-mid);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.markdown-preview {
+    min-height: 310px;
+    height: 100%;
+    padding: 18px 20px;
+    overflow: auto;
+    color: var(--text);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    box-shadow: var(--shadow-inset);
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+}
+
+.markdown-preview > :first-child { margin-top: 0; }
+.markdown-preview > :last-child { margin-bottom: 0; }
+.markdown-preview p { margin: 0 0 12px; }
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+    color: var(--text-strong);
+    line-height: 1.3;
+    margin: 20px 0 10px;
+}
+.markdown-preview h1 { font-size: 24px; }
+.markdown-preview h2 { font-size: 20px; }
+.markdown-preview h3 { font-size: 17px; }
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 { font-size: 15px; }
+.markdown-preview ul,
+.markdown-preview ol {
+    margin: 0 0 14px;
+    padding-left: 26px;
+}
+.markdown-preview li { margin: 4px 0; }
+.markdown-preview blockquote {
+    margin: 0 0 14px;
+    padding: 8px 14px;
+    color: var(--text-mid);
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 var(--r-xs) var(--r-xs) 0;
+}
+.markdown-preview blockquote p { margin: 0; }
+.markdown-preview code {
+    padding: 2px 5px;
+    color: var(--accent-deep);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 0.9em;
+}
+.markdown-preview pre {
+    margin: 0 0 14px;
+    padding: 14px;
+    overflow: auto;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+}
+.markdown-preview pre code {
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    border: 0;
+}
+.markdown-preview a { color: var(--accent-deep); }
+.markdown-preview hr {
+    margin: 18px 0;
+    border: 0;
+    border-top: 1px solid var(--border-hi);
+}
+.markdown-preview .task-item {
+    list-style: none;
+    margin-left: -21px;
+}
+.markdown-preview .task-item input {
+    width: 15px;
+    height: 15px;
+    margin: 0 7px 0 0;
+    vertical-align: -2px;
+    accent-color: var(--accent);
+}
+.markdown-empty {
+    color: var(--text-faint);
+    font-style: italic;
+}
+
 /* Loading state */
 .loading .main { opacity: 0.4; pointer-events: none; }
 
 /* Responsive */
+@media (max-width: 1120px) {
+    .markdown-workspace { grid-template-columns: 1fr; }
+    .markdown-preview { min-height: 220px; }
+}
+
 @media (max-width: 900px) {
     .app { grid-template-columns: 1fr; }
     .sidebar { display: none; }
@@ -785,7 +945,7 @@ select option { background: var(--bg); color: var(--text); }
     <aside class="sidebar">
         <div class="sidebar-brand">
             <div class="logo">Ticket<br>Generator</div>
-            <div class="version">v2.1 &mdash; server edition</div>
+            <div class="version">v2.1 &mdash; markdown shell</div>
         </div>
         <nav class="nav-group">
             <div class="nav-label">Workspace</div>
@@ -805,7 +965,7 @@ select option { background: var(--bg); color: var(--text); }
         <div id="tab-ticket" class="panel active">
             <div class="page-header">
                 <h2>Ticket Form</h2>
-                <div class="desc">Fill in the fields, generate, and copy. AD Lookup auto-populates from Active Directory.</div>
+                <div class="desc">Fill in the fields, write the process in Markdown, then generate and copy. AD Lookup auto-populates from Active Directory.</div>
             </div>
             <div class="card">
                 <div class="card-title">Preset</div>
@@ -840,8 +1000,29 @@ select option { background: var(--bg); color: var(--text); }
                         <textarea id="txtSituation" rows="4" placeholder="What happened?"></textarea>
                     </div>
                     <div class="field">
-                        <label>Process</label>
-                        <textarea id="txtProcess" rows="4" placeholder="What did you do?"></textarea>
+                        <label>Process (Markdown)</label>
+                        <div class="markdown-workspace">
+                            <div class="markdown-source">
+                                <div class="markdown-toolbar" id="processMarkdownToolbar"
+                                     aria-label="Process Markdown formatting">
+                                    <button type="button" class="md-tool" data-md-action="bullet">Bullets</button>
+                                    <button type="button" class="md-tool" data-md-action="numbered">Numbered</button>
+                                    <button type="button" class="md-tool" data-md-action="bold">Bold</button>
+                                    <button type="button" class="md-tool" data-md-action="italic">Italic</button>
+                                    <button type="button" class="md-tool" data-md-action="heading">Heading</button>
+                                    <button type="button" class="md-tool" data-md-action="quote">Quote</button>
+                                    <button type="button" class="md-tool" data-md-action="code">Code</button>
+                                    <button type="button" class="md-tool" data-md-action="link">Link</button>
+                                </div>
+                                <textarea id="txtProcess" rows="10"
+                                    placeholder="- Validated the user&#10;- Reset the password&#10;- Confirmed successful access"></textarea>
+                            </div>
+                            <div class="markdown-preview-panel">
+                                <div class="markdown-preview-label">Live Preview</div>
+                                <div class="markdown-preview" id="processMarkdownPreview"
+                                     aria-live="polite"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -994,7 +1175,7 @@ select option { background: var(--bg); color: var(--text); }
 
 <div class="status-bar">
     <span id="statusText">Connecting...</span>
-    <span class="shortcuts">Enter = Generate &middot; Ctrl+Space = AD Lookup &middot; Shift+Del = Clear</span>
+    <span class="shortcuts">Ctrl+Enter = Generate &middot; Ctrl+Space = AD Lookup &middot; Shift+Del = Clear</span>
 </div>
 <script>
 // ====================================================================
@@ -1039,6 +1220,250 @@ function expandTemplate(tpl, vals) {
     let r = tpl || '';
     for (const k in vals) r = r.replaceAll(`{{${k}}}`, vals[k] || '');
     return r;
+}
+
+// ====================================================================
+// MARKDOWN PROCESS EDITOR
+// Dependency-free and HTML-safe. The preview is intentionally a focused
+// ServiceDesk-style subset; the original Markdown text is never altered.
+// ====================================================================
+function escapeMarkdownHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderMarkdownInline(source) {
+    const codeFragments = [];
+    let text = escapeMarkdownHtml(source);
+
+    text = text.replace(/`([^`\n]+)`/g, (_, code) => {
+        const token = `@@MD_CODE_${codeFragments.length}@@`;
+        codeFragments.push(`<code>${code}</code>`);
+        return token;
+    });
+
+    // Only explicit web/mail schemes become clickable. Everything else stays
+    // visible as text, preventing javascript: or data: URLs in the preview.
+    text = text.replace(
+        /\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)/gi,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+    text = text
+        .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/__([^_\n]+)__/g, '<strong>$1</strong>')
+        .replace(/~~([^~\n]+)~~/g, '<del>$1</del>')
+        .replace(
+            /(^|[\s(])\*([^*\n]+)\*(?=$|[\s).,!?:;])/g,
+            '$1<em>$2</em>'
+        )
+        .replace(
+            /(^|[\s(])_([^_\n]+)_(?=$|[\s).,!?:;])/g,
+            '$1<em>$2</em>'
+        );
+
+    codeFragments.forEach((fragment, index) => {
+        text = text.replace(`@@MD_CODE_${index}@@`, fragment);
+    });
+    return text;
+}
+
+function markdownBlockKind(line) {
+    if (/^```/.test(line)) return 'fence';
+    if (/^#{1,6}\s+/.test(line)) return 'heading';
+    if (/^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line)) return 'rule';
+    if (/^\s*>\s?/.test(line)) return 'quote';
+    if (/^\s*(?:[-+*]|\d+[.)])\s+/.test(line)) return 'list';
+    return '';
+}
+
+function renderProcessMarkdown(source) {
+    const markdown = String(source || '').replace(/\r\n?/g, '\n');
+    if (!markdown.trim()) {
+        return '<div class="markdown-empty">Your rendered process will appear here.</div>';
+    }
+
+    const lines = markdown.split('\n');
+    const output = [];
+    let listType = '';
+    const closeList = () => {
+        if (!listType) return;
+        output.push(`</${listType}>`);
+        listType = '';
+    };
+
+    for (let index = 0; index < lines.length; index++) {
+        const line = lines[index];
+
+        const fence = line.match(/^```\s*([a-z0-9_-]*)\s*$/i);
+        if (fence) {
+            closeList();
+            const codeLines = [];
+            index++;
+            while (index < lines.length && !/^```\s*$/.test(lines[index])) {
+                codeLines.push(lines[index]);
+                index++;
+            }
+            const language = fence[1]
+                ? ` data-language="${escapeMarkdownHtml(fence[1])}"`
+                : '';
+            output.push(
+                `<pre><code${language}>${escapeMarkdownHtml(codeLines.join('\n'))}</code></pre>`
+            );
+            continue;
+        }
+
+        if (!line.trim()) {
+            closeList();
+            continue;
+        }
+
+        const heading = line.match(/^(#{1,6})\s+(.+)$/);
+        if (heading) {
+            closeList();
+            const level = heading[1].length;
+            output.push(`<h${level}>${renderMarkdownInline(heading[2])}</h${level}>`);
+            continue;
+        }
+
+        if (/^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line)) {
+            closeList();
+            output.push('<hr>');
+            continue;
+        }
+
+        if (/^\s*>\s?/.test(line)) {
+            closeList();
+            const quoteLines = [];
+            while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+                quoteLines.push(lines[index].replace(/^\s*>\s?/, ''));
+                index++;
+            }
+            index--;
+            output.push(
+                `<blockquote><p>${quoteLines.map(renderMarkdownInline).join('<br>')}</p></blockquote>`
+            );
+            continue;
+        }
+
+        const listItem = line.match(/^\s*([-+*]|\d+[.)])\s+(.+)$/);
+        if (listItem) {
+            const nextListType = /^\d/.test(listItem[1]) ? 'ol' : 'ul';
+            if (listType !== nextListType) {
+                closeList();
+                listType = nextListType;
+                output.push(`<${listType}>`);
+            }
+
+            const task = listItem[2].match(/^\[([ xX])\]\s+(.*)$/);
+            if (task) {
+                const checked = task[1].toLowerCase() === 'x' ? ' checked' : '';
+                output.push(
+                    `<li class="task-item"><input type="checkbox" disabled${checked}>` +
+                    `${renderMarkdownInline(task[2])}</li>`
+                );
+            } else {
+                output.push(`<li>${renderMarkdownInline(listItem[2])}</li>`);
+            }
+            continue;
+        }
+
+        closeList();
+        const paragraph = [line.trim()];
+        while (
+            index + 1 < lines.length &&
+            lines[index + 1].trim() &&
+            !markdownBlockKind(lines[index + 1])
+        ) {
+            paragraph.push(lines[++index].trim());
+        }
+        output.push(`<p>${paragraph.map(renderMarkdownInline).join('<br>')}</p>`);
+    }
+
+    closeList();
+    return output.join('');
+}
+
+function updateProcessMarkdownPreview() {
+    const preview = byId('processMarkdownPreview');
+    if (preview) preview.innerHTML = renderProcessMarkdown(byId('txtProcess')?.value || '');
+}
+
+function replaceProcessSelection(replacement, selectionOffset, selectionLength) {
+    const editor = byId('txtProcess');
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    editor.value = editor.value.slice(0, start) + replacement + editor.value.slice(end);
+    editor.focus();
+    const nextStart = start + selectionOffset;
+    editor.setSelectionRange(nextStart, nextStart + selectionLength);
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function wrapProcessSelection(prefix, suffix, placeholder) {
+    const editor = byId('txtProcess');
+    const selected = editor.value.slice(editor.selectionStart, editor.selectionEnd);
+    const content = selected || placeholder;
+    replaceProcessSelection(
+        prefix + content + suffix,
+        prefix.length,
+        content.length
+    );
+}
+
+function prefixProcessLines(kind) {
+    const editor = byId('txtProcess');
+    const value = editor.value;
+    const selectionWasCollapsed = editor.selectionStart === editor.selectionEnd;
+    const start = value.lastIndexOf('\n', Math.max(0, editor.selectionStart - 1)) + 1;
+    const nextBreak = value.indexOf('\n', editor.selectionEnd);
+    const end = nextBreak === -1 ? value.length : nextBreak;
+    const lines = value.slice(start, end).split('\n');
+
+    const replacements = lines.map((line, index) => {
+        if (kind === 'bullet') {
+            return `- ${line.replace(/^\s*(?:[-+*]|\d+[.)])\s+/, '')}`;
+        }
+        if (kind === 'numbered') {
+            return `${index + 1}. ${line.replace(/^\s*(?:[-+*]|\d+[.)])\s+/, '')}`;
+        }
+        if (kind === 'heading') {
+            return `## ${line.replace(/^\s*#{1,6}\s+/, '')}`;
+        }
+        return `> ${line.replace(/^\s*>\s?/, '')}`;
+    });
+    const replacement = replacements.join('\n');
+
+    editor.setSelectionRange(start, end);
+    replaceProcessSelection(
+        replacement,
+        selectionWasCollapsed ? replacement.length : 0,
+        selectionWasCollapsed ? 0 : replacement.length
+    );
+}
+
+function applyProcessMarkdownAction(action) {
+    const editor = byId('txtProcess');
+    const selected = editor.value.slice(editor.selectionStart, editor.selectionEnd);
+
+    if (['bullet', 'numbered', 'heading', 'quote'].includes(action)) {
+        prefixProcessLines(action);
+    } else if (action === 'bold') {
+        wrapProcessSelection('**', '**', 'bold text');
+    } else if (action === 'italic') {
+        wrapProcessSelection('*', '*', 'italic text');
+    } else if (action === 'code') {
+        if (selected.includes('\n')) {
+            wrapProcessSelection('```\n', '\n```', 'code');
+        } else {
+            wrapProcessSelection('`', '`', 'code');
+        }
+    } else if (action === 'link') {
+        wrapProcessSelection('[', '](https://example.com)', 'link text');
+    }
 }
 
 // Accepts either the current object form { label, outputKey, options }
@@ -1249,6 +1674,7 @@ byId('cmbTemplate').addEventListener('change', function() {
     const applied = filled.length ? `  \u00b7  Filled: ${filled.join(' + ')}` : '';
     byId('templateMeta').textContent =
         `Category: ${meta.Category || '\u2014'}  \u00b7  Subcategory: ${meta.Subcategory || '\u2014'}  \u00b7  Item: ${meta.Item || '\u2014'}${applied}`;
+    updateProcessMarkdownPreview();
 });
 
 // ====================================================================
@@ -1413,6 +1839,7 @@ function clearTicketForm() {
     }
     setVal('txtSituation', '');
     setVal('txtProcess', '');
+    updateProcessMarkdownPreview();
     byId('cmbTemplate').selectedIndex = 0;
     byId('cmbTicketType').selectedIndex = 0;
     document.querySelectorAll('#dropdownsGrid select').forEach(s => s.selectedIndex = 0);
@@ -1429,6 +1856,46 @@ byId('btnGenerate').addEventListener('click', () => generateTicket(true));
 byId('btnCopyOutput').addEventListener('click', copyOutput);
 byId('btnCopyJson').addEventListener('click', copyJson);
 byId('btnClear').addEventListener('click', clearTicketForm);
+
+byId('txtProcess').addEventListener('input', updateProcessMarkdownPreview);
+byId('processMarkdownToolbar').addEventListener('click', event => {
+    const button = event.target.closest('[data-md-action]');
+    if (button) applyProcessMarkdownAction(button.dataset.mdAction);
+});
+byId('txtProcess').addEventListener('keydown', event => {
+    if (
+        event.key !== 'Enter' ||
+        event.shiftKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+    ) return;
+
+    const editor = event.currentTarget;
+    const beforeCaret = editor.value.slice(0, editor.selectionStart);
+    const lineStart = beforeCaret.lastIndexOf('\n') + 1;
+    const currentLine = beforeCaret.slice(lineStart);
+    const listItem = currentLine.match(/^(\s*)([-+*]|\d+[.)])\s+(.*)$/);
+    if (!listItem) return;
+
+    event.preventDefault();
+    const [, indent, marker, content] = listItem;
+    if (!content.trim()) {
+        editor.setRangeText('', lineStart, editor.selectionStart, 'end');
+    } else {
+        const nextMarker = /^\d/.test(marker)
+            ? `${Number.parseInt(marker, 10) + 1}.`
+            : marker;
+        const taskPrefix = /^\[[ xX]\]\s+/.test(content) ? '[ ] ' : '';
+        editor.setRangeText(
+            `\n${indent}${nextMarker} ${taskPrefix}`,
+            editor.selectionStart,
+            editor.selectionEnd,
+            'end'
+        );
+    }
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+});
 
 // ====================================================================
 // QUICK REQUEST
@@ -2476,8 +2943,7 @@ document.addEventListener('keydown', e => {
     }
     if (e.key === 'Enter' && tab !== 'editor') {
         const tag = document.activeElement?.tagName;
-        if (tag === 'TEXTAREA' && e.shiftKey) return;
-        if (tag === 'TEXTAREA') e.preventDefault();
+        if (tag === 'TEXTAREA' && !e.ctrlKey) return;
         if (tag === 'SELECT') return;
         e.preventDefault();
         if (tab === 'ticket') generateTicket(true); else if (tab === 'request') generateQuickRequest();
@@ -2519,6 +2985,7 @@ async function init() {
         buildTokenChips();
         byId('templateEditor').value = CFG.blockTemplate || '';
         updatePreview();
+        updateProcessMarkdownPreview();
 
         byId('txtName')?.addEventListener('input', syncIdentity);
         byId('txtUser')?.addEventListener('input', syncIdentity);

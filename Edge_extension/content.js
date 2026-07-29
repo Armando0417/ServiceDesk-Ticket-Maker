@@ -338,26 +338,39 @@ setTimeout(AF_hookIframes, 500);
 // ====================================================================
 // HUD
 // ====================================================================
+var AF_HUD_COLORS = {
+    text: '#172033',
+    textMuted: '#526076',
+    textFaint: '#7c8aa0',
+    border: '#d8e0eb',
+    borderStrong: '#c5d0df',
+    surface: '#f7f9fc',
+    primary: '#2563eb',
+    primaryHover: '#1d4ed8',
+    success: '#16803d',
+    danger: '#c62828'
+};
+
 function AF_createHUD() {
     var old = document.getElementById('af-hud');
     if (old) old.remove();
 
     var hud = document.createElement('div');
     hud.id = 'af-hud';
-    hud.style.cssText = 'position:fixed;top:10px;right:10px;width:260px;background:#18181cee;border:1px solid #333;border-radius:8px;font-family:Consolas,monospace;font-size:11px;color:#e0ddd6;z-index:999999;box-shadow:0 8px 24px rgba(0,0,0,0.4)';
+    hud.style.cssText = 'position:fixed;top:40px;right:12px;width:286px;box-sizing:border-box;color-scheme:light;background:#ffffff;border:1px solid #d8e0eb;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;font-size:12px;line-height:1.45;color:#172033;z-index:999999;box-shadow:0 2px 4px rgba(15,23,42,0.06),0 12px 28px rgba(15,23,42,0.14);overflow:hidden';
 
     hud.innerHTML = [
-        '<div id="af-header" style="padding:8px 12px;background:#1a1a1f;border-bottom:1px solid #333;color:#d4a843;font-weight:bold;font-size:12px;cursor:move;display:flex;justify-content:space-between">',
-        ' <span>L1 Autofill</span>',
-        ' <span id="af-min" style="cursor:pointer;color:#888">_</span>',
+        '<div id="af-header" style="box-sizing:border-box;padding:10px 12px;background:linear-gradient(180deg,#f8fbff 0%,#eef5ff 100%);border-bottom:1px solid #dbe7f7;color:#172033;font-weight:700;font-size:12.5px;letter-spacing:-0.12px;cursor:move;display:flex;align-items:center;justify-content:space-between">',
+        ' <span style="display:flex;align-items:center;gap:8px"><span style="display:block;width:9px;height:9px;border-radius:50%;background:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,0.12)"></span>Ticket Autofill</span>',
+        ' <button id="af-min" type="button" aria-label="Minimize" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;background:#ffffff;color:#526076;border:1px solid #cbd7e6;border-radius:7px;font-family:inherit;font-size:15px;line-height:1;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,0.05)">&#8722;</button>',
         '</div>',
-        '<div id="af-body" style="padding:8px 12px">',
-        ' <div id="af-status" style="color:#8a877f;margin-bottom:6px">No data loaded</div>',
-        ' <button id="af-load" style="display:block;width:100%;padding:6px;background:#d4a843;color:#18181c;border:none;border-radius:4px;font-family:inherit;font-size:11px;font-weight:bold;cursor:pointer;margin-bottom:6px">Load from Clipboard</button>',
-        ' <div style="color:#555;font-size:10px;margin-bottom:2px">Or paste JSON:</div>',
-        ' <textarea id="af-paste" style="width:100%;height:40px;background:#111;color:#aaa;border:1px solid #333;border-radius:4px;padding:4px;font-family:Consolas,monospace;font-size:10px;resize:vertical;margin-bottom:6px"></textarea>',
-        ' <div id="af-fields" style="max-height:180px;overflow-y:auto;margin-bottom:6px"></div>',
-        ' <div id="af-log" style="max-height:80px;overflow-y:auto;border-top:1px solid #333;padding-top:4px;font-size:10px;color:#666"></div>',
+        '<div id="af-body" style="box-sizing:border-box;padding:12px;background:#ffffff">',
+        ' <div id="af-status" style="box-sizing:border-box;padding:7px 9px;margin-bottom:9px;background:#f7f9fc;color:#526076;border:1px solid #e3e8f0;border-radius:8px;font-size:11px;font-weight:600">No data loaded</div>',
+        ' <button id="af-load" type="button" style="display:block;width:100%;box-sizing:border-box;padding:8px 10px;margin:0 0 10px;background:#2563eb;color:#ffffff;border:1px solid #1d4ed8;border-radius:8px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(37,99,235,0.22),0 4px 10px rgba(37,99,235,0.16)">Load from Clipboard</button>',
+        ' <div style="color:#526076;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.45px;margin-bottom:5px">Or paste JSON</div>',
+        ' <textarea id="af-paste" aria-label="Paste ticket JSON" placeholder="{ &quot;name&quot;: &quot;...&quot; }" style="display:block;width:100%;height:54px;box-sizing:border-box;background:#f7f9fc;color:#172033;caret-color:#2563eb;border:1px solid #c5d0df;border-radius:8px;padding:7px 8px;outline:none;font-family:Consolas,monospace;font-size:10px;line-height:1.4;resize:vertical;margin:0 0 9px"></textarea>',
+        ' <div id="af-fields" style="box-sizing:border-box;max-height:190px;overflow-y:auto;margin-bottom:9px;background:#f7f9fc;border:1px solid #e3e8f0;border-radius:8px;padding:3px 6px"></div>',
+        ' <div id="af-log" style="box-sizing:border-box;max-height:86px;overflow-y:auto;background:#fbfcfe;border:1px solid #e3e8f0;border-radius:8px;padding:6px 8px;font-size:10px;line-height:1.5;color:#7c8aa0"></div>',
         '</div>'
     ].join('\n');
 
@@ -371,7 +384,26 @@ function AF_createHUD() {
 
     document.getElementById('af-load').addEventListener('click', AF_loadClipboard);
 
-    document.getElementById('af-paste').addEventListener('input', function() {
+    var loadButton = document.getElementById('af-load');
+    loadButton.addEventListener('mouseenter', function() {
+        this.style.background = AF_HUD_COLORS.primaryHover;
+    });
+    loadButton.addEventListener('mouseleave', function() {
+        this.style.background = AF_HUD_COLORS.primary;
+    });
+
+    var pasteBox = document.getElementById('af-paste');
+    pasteBox.addEventListener('focus', function() {
+        this.style.borderColor = AF_HUD_COLORS.primary;
+        this.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)';
+        this.style.background = '#ffffff';
+    });
+    pasteBox.addEventListener('blur', function() {
+        this.style.borderColor = AF_HUD_COLORS.borderStrong;
+        this.style.boxShadow = 'none';
+        this.style.background = AF_HUD_COLORS.surface;
+    });
+    pasteBox.addEventListener('input', function() {
         try {
             var d = JSON.parse(this.value);
             AF_loadData(d);
@@ -405,10 +437,10 @@ function AF_updateHUD() {
         var v = m.val(AF_data);
         if (!v) continue;
         var done = AF_filled[k];
-        var c = done ? '#5cb85c' : '#8a877f';
-        var icon = done ? '>' : ' ';
+        var c = done ? AF_HUD_COLORS.success : AF_HUD_COLORS.textMuted;
+        var icon = done ? '&#10003;' : '&#8226;';
         var prev = v.length > 25 ? v.substring(0, 25) + '..' : v;
-        html += '<div style="padding:1px 0;color:' + c + '">' + icon + ' <span style="color:#bbb">' + m.label + ':</span> ' + prev.replace(/</g, '&lt;') + '</div>';
+        html += '<div style="padding:4px 2px;color:' + c + ';border-bottom:1px solid #edf1f6">' + icon + ' <span style="color:#344258;font-weight:600">' + m.label + ':</span> ' + prev.replace(/</g, '&lt;') + '</div>';
     }
     fl.innerHTML = html;
 }
@@ -418,7 +450,7 @@ function AF_log(msg) {
     if (!lg) return;
     var t = new Date();
     var ts = [t.getHours(), t.getMinutes(), t.getSeconds()].map(function(n){ return n < 10 ? '0'+n : ''+n; }).join(':');
-    lg.innerHTML += '<div style="color:#5cb85c">' + ts + ' ' + msg + '</div>';
+    lg.innerHTML += '<div style="color:' + AF_HUD_COLORS.success + '">' + ts + ' ' + msg + '</div>';
     lg.scrollTop = lg.scrollHeight;
 }
 
@@ -432,7 +464,7 @@ function AF_loadData(data) {
     AF_loadId++;
     AF_active = true;
     var st = document.getElementById('af-status');
-    if (st) { st.style.color = '#5cb85c'; st.textContent = 'Loaded: ' + (data.name || data.user || 'ticket'); }
+    if (st) { st.style.color = AF_HUD_COLORS.success; st.textContent = 'Loaded: ' + (data.name || data.user || 'ticket'); }
     AF_updateHUD();
     AF_log('Data loaded - click/tab fields to fill');
     console.log('[AF] Data loaded:', data.name || data.user);
@@ -447,7 +479,7 @@ async function AF_loadClipboard() {
         if (pb) pb.value = text;
     } catch(e) {
         var st = document.getElementById('af-status');
-        if (st) { st.style.color = '#c94040'; st.textContent = 'Clipboard failed - paste JSON below'; }
+        if (st) { st.style.color = AF_HUD_COLORS.danger; st.textContent = 'Clipboard failed - paste JSON below'; }
         console.log('[AF] Clipboard error:', e.message);
     }
 }
