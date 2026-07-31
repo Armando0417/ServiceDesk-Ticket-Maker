@@ -1,5 +1,6 @@
 {
-    "appVersion": "3.6.0+20260731",
+    "appVersion": "3.6.2026.731",
+    "displayVersion": "3.6",
     "technician": "Armando",
 
     "_comment_quickRequestSuffix": "Appended to the header line of every Quick Request output. Leading space is intentional. Set to \"\" to disable.",

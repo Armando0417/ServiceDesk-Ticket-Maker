@@ -4,7 +4,9 @@
 var AF_APP_VERSION = (function() {
     try {
         var manifest = chrome.runtime.getManifest();
-        return manifest.version_name || manifest.version || '';
+        var releaseVersion = manifest.version_name || manifest.version || '';
+        var shortVersion = String(releaseVersion).match(/^v?(\d+\.\d+)/i);
+        return shortVersion ? shortVersion[1] : releaseVersion;
     } catch (e) {
         return '';
     }

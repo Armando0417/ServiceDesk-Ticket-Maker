@@ -2962,8 +2962,8 @@ async function init() {
         if (!data.ok) { setStatus('Config load failed.', 'var(--danger)'); return; }
         CFG = data;
 
-        const versionLabel = CFG.appVersion
-            ? `v${String(CFG.appVersion).replace(/^v/i, '')}`
+        const versionLabel = CFG.displayVersion
+            ? `v${String(CFG.displayVersion).replace(/^v/i, '')}`
             : 'version unavailable';
         byId('appVersion').textContent = `${versionLabel} — markdown shell`;
         document.title = `Ticket Generator ${versionLabel} — Markdown Shell`;

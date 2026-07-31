@@ -177,7 +177,8 @@ function Write-ServerException {
 # ============================================================================
 
 $DefaultConfig = @{
-    appVersion           = '3.6.0+20260731'
+    appVersion           = '3.6.2026.731'
+    displayVersion       = '3.6'
     technician         = ''
     quickRequestSuffix = ' (Elevance)'
     quickActions = [ordered]@{
@@ -353,6 +354,7 @@ function Load-Config {
         # Merge with defaults — anything missing in config.json falls back
         $cfg = $DefaultConfig.Clone()
         if ($null -ne $raw.appVersion)         { $cfg.appVersion         = [string]$raw.appVersion }
+        if ($null -ne $raw.displayVersion)     { $cfg.displayVersion     = [string]$raw.displayVersion }
         if ($null -ne $raw.technician)         { $cfg.technician         = [string]$raw.technician }
         if ($null -ne $raw.quickRequestSuffix) { $cfg.quickRequestSuffix = [string]$raw.quickRequestSuffix }
         if ($null -ne $raw.quickActions)  { $cfg.quickActions  = $raw.quickActions }
@@ -476,7 +478,7 @@ $Config        = Load-Config
 $BlockTemplate = Load-BlockTemplate
 $TemplateMap   = Load-TemplateMap
 
-Write-ServerLog 'SUCCESS' "Startup: configuration loaded; appVersion='$($Config.appVersion)'; technician='$(if ($Config.technician) { $Config.technician } else { '(not set)' })'; templates=$($TemplateMap.Count); blockCharacters=$($BlockTemplate.Length)"
+Write-ServerLog 'SUCCESS' "Startup: configuration loaded; appVersion='$($Config.appVersion)'; displayVersion='$($Config.displayVersion)'; technician='$(if ($Config.technician) { $Config.technician } else { '(not set)' })'; templates=$($TemplateMap.Count); blockCharacters=$($BlockTemplate.Length)"
 
 
 # ============================================================================
@@ -848,6 +850,7 @@ function Handle-Request($context) {
         Send-Json $res @{
             ok                 = $true
             appVersion         = $Config.appVersion
+            displayVersion     = $Config.displayVersion
             technician         = $Config.technician
             quickRequestSuffix = $Config.quickRequestSuffix
             quickActions       = $Config.quickActions
