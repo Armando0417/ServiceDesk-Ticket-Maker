@@ -39,6 +39,8 @@ Requirements:
 - Access to the corporate Active Directory environment
 - The ActiveDirectory PowerShell module for AD lookups
 
+> BEFORE RUNNING! Open the config.json in notepad and change the technician name to your name (and preferably your last name to better identify you)
+
 To run the app, open a terminal window in the project directory:
 
 ```powershell

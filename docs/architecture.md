@@ -7,7 +7,9 @@ The PowerShell server is a small local bridge between the browser application an
 - the corporate Active Directory;
 - the Windows clipboard;
 - configuration and template files on disk;
-- persistent diagnostic logging.
+- persistent diagnostic logging.'
+
+The reason for this split is simple: Have the freedom in stylings of HTML, CSS, JS with the CLI capabilities.
 
 The browser remains responsible for presenting the interface, building ticket content, previewing Markdown, and analyzing exported tickets. The extension later converts the generated Markdown subset into sanitized rich HTML when it fills ServiceDesk. The server does not render forms or contain a second copy of the frontend's form structure. It serves the application and exposes a narrow local API for the operations that require Windows or filesystem access.
 
@@ -37,20 +39,20 @@ flowchart LR
     Extension --> ServiceDesk[ManageEngine ServiceDesk]
 ```
 
-The extension is not hosted by, and does not call, the PowerShell server. It is a separate unpacked browser extension that consumes the generated JSON through the clipboard when the ServiceDesk workflow reaches that machine.
+The extension is not hosted by, and does not call, the PowerShell server. It is a separate unpacked browser extension that consumes the generated JSON through the clipboard when the ServiceDesk workflow reaches that machine. This is because the only way to interact with the server, ideally is through the SPA
 
-## Why this architecture works
+## Why this architecture?
 
 The design deliberately uses the smallest practical components for the environment:
 
-1. **`HttpListener` provides a local HTTP origin.** The SPA can use ordinary `fetch()` calls instead of browser-specific filesystem or PowerShell integrations.
+1. **`HttpListener` provides a local HTTP origin.** The SPA can use ordinary `fetch()` calls instead of browser-specific filesystem or fancy PowerShell integrations.
 2. **The listener is bound only to `127.0.0.1`.** Other machines cannot connect to port 8080 through this listener, so the server is not exposed as a LAN web service.
-3. **A per-run token protects the API.** The startup URL carries a newly generated 24-character token. The frontend reads it and includes it in every API request.
+3. **A per-run token protects the API.** The startup URL carries a newly generated 24-character token. The frontend reads it and includes it in every API request. Without the token, the server will not respond. 
 4. **PowerShell supplies the Windows integration layer.** The ActiveDirectory module performs directory lookups, and `System.Windows.Forms.Clipboard` writes to the interactive Windows clipboard.
-5. **The frontend is configuration-driven.** `/api/config` sends the field definitions, dropdowns, mappings, preset templates, technician, and output block to the SPA. Most customization therefore requires editing data rather than application code.
+5. **The frontend is configuration-driven.** `/api/config` sends the field definitions, dropdowns, mappings, preset templates, technician's name, and output block to the SPA. Most customization therefore requires editing data rather than application code.
 6. **Runtime files remain beside the application.** Paths are resolved from `$PSScriptRoot`, so launching the script from another working directory does not make it read or write the wrong files.
 
-It is best understood as a local desktop utility that happens to use a browser for its interface—not as a conventional multi-user web server.
+It is best understood as a local desktop utility that happens to use a browser for its interface; not as a conventional multi-user web server.
 
 ## Component responsibilities
 
@@ -90,7 +92,7 @@ The technician's customized outer ticket layout. It is created when the Template
 
 ### `server.log`
 
-An append-only runtime diagnostic log. All log levels are written to this file even when the server is running in quiet mode. Request bodies and clipboard contents are deliberately excluded.
+An append-only runtime diagnostic log. All log levels are written to this file even when the server is running in quiet mode (ie. not verbose). Request bodies and clipboard contents are deliberately excluded to keep it a bit cleaner.
 
 ## Startup lifecycle
 
@@ -107,7 +109,7 @@ When `server.ps1` starts, it performs these operations in order:
 9. Opens the current application URL in the default browser.
 10. Enters the request loop until the process is stopped.
 
-The token is intentionally ephemeral. Restarting the server invalidates URLs from the previous process, so the complete URL printed by the current server must be used.
+The token is intentionally ephemeral. Restarting the server invalidates URLs from the previous process, so the complete URL printed by the current server must be used. This makes it so that if you don't open the URL with the current token, it will not connect. 
 
 ## Request lifecycle
 
@@ -192,13 +194,13 @@ This normalization creates one stable structure for the frontend while allowing 
 
 Configuration and template files are read with `[System.IO.File]::ReadAllText(...)`, not `Get-Content -Raw`.
 
-In Windows PowerShell 5.1, the FileSystem provider can decorate values returned by `Get-Content` with PowerShell extended properties such as `PSPath`, `PSDrive`, and `PSProvider`. If the saved block is later included in the `/api/config` response, `ConvertTo-Json` may recursively walk that metadata. The result can appear to hang while serializing `blockTemplate` or `templateMap`.
+I ran into lots of bugs and found out that in Windows PowerShell 5.1, the FileSystem provider can decorate values returned by `Get-Content` with PowerShell extended properties such as `PSPath`, `PSDrive`, and `PSProvider`. If the saved block is later included in the `/api/config` response, `ConvertTo-Json` may recursively walk that metadata. The result can appear to hang while serializing `blockTemplate` or `templateMap`. This was the bug in v3.5
 
 `ReadAllText` returns a plain `System.String`, so JSON serialization sees only the template text. This is the reason the saved `block_template.txt` can now be loaded and returned reliably after a server restart.
 
 ## Active Directory flow
 
-`GET /api/ad` accepts either `?user=` or `?name=`:
+`GET /api/ad` accepts either `?user=` or `?name=`: (still waiting for AL & Phone number lookups)
 
 1. The server imports the ActiveDirectory module.
 2. For a username, it first attempts `Get-ADUser -Identity`, which is efficient for an exact account name.
@@ -281,7 +283,7 @@ Logs intentionally describe structure rather than sensitive payloads. They recor
 
 ## Security boundary
 
-The current safeguards are suitable for the intended single-user VDI workflow:
+I'm not a Cybersecurity professional nor am I trying to be. The current safeguards were a simple idea I had for the intended use of single-user VDI workflow:
 
 - the listener binds to the IPv4 loopback address only;
 - privileged API routes require a fresh per-process token;
@@ -291,23 +293,23 @@ The current safeguards are suitable for the intended single-user VDI workflow:
 - no general-purpose command or arbitrary file API is exposed;
 - diagnostic logs omit ticket and clipboard bodies.
 
-The server intentionally does not provide HTTPS, account authentication, role separation, or multi-user isolation. Those features would add complexity without improving the current one-person, one-machine use case. If the listener is ever changed from `127.0.0.1` to a LAN address, this security model must be redesigned before deployment.
+The server intentionally does not provide HTTPS (didn't want to bother with certificates), account authentication, role separation, or multi-user isolation. Those features would add complexity without improving the current one-person, one-machine use case. If the listener is ever changed from `127.0.0.1` to a LAN address, this security model must be redesigned drastically.
 
 ## Current constraints
 
 - Windows is required for `System.Windows.Forms.Clipboard` and the intended AD tooling.
 - Corporate domain access and the ActiveDirectory PowerShell module are required for lookups.
-- Port 8080 must be available.
-- Only one request is processed at a time.
+- Port 8080 must be available. (It does NOT switch to another port)
+- Only one request is processed at a time. (shouldn't be an issue)
 - The server keeps current configuration in process-wide script variables.
 - The token is exposed in the browser URL and startup console by design.
-- There is no database, background service, installer, or automatic update mechanism.
+- There is no database (yet), background service, installer, or automatic update mechanism.
 - The two ServiceDesk extensions are installed separately and must not be enabled together.
 
 These are conscious boundaries of a lightweight local tool. The architecture can grow later, but its present strength is that it remains inspectable, portable within the VDI, and operable with PowerShell plus a browser.
 
 ## Historical evolution
 
-The project began as a personal, fixed-format ticket form. It gradually became configuration-driven as more technicians needed different field layouts and writing styles. Presets moved into `templates.json`, the outer ticket block became persistable, dropdowns became data-defined, and the current shell added Markdown editing with sanitized rich-HTML clipboard output.
+The project began as a personal, fixed-format ticket form in HTML. Early I noticed that I really was just using it as a more "limiting notepad". This made me explore into more "script" based approach as I was incorporating the Get-ADUser command but needed a GUI. This GUI was obv, very ugly cuz winforms is not very flexible. I took some time to figure out if i leaned to the powershell approach (ugliness at the price of usability with AD Lookups) or SPA (good looking but lack AD Lookups). Eventually I thought: "what about having a shell server..." and this is the end product. I kept expanding it through versions, adding new features while still thinking: "how can other people use it and suit their styles" which lead to becoming more configuration-driven as more technicians needed different field layouts and writing styles. Presets moved into `templates.json`, the outer ticket block became persistable, dropdowns became data-defined, and the current shell added Markdown editing with sanitized rich-HTML clipboard output (this was just cuz I think good looking tickets improve readability).
 
-The server stayed deliberately small throughout that evolution. Instead of becoming a template engine or UI framework, it became the stable boundary beneath both the current and legacy shells: serve files, provide configuration, perform Windows-only operations, and keep those operations observable through logs.
+The server stayed deliberately small throughout that evolution. Instead of becoming a template engine or UI framework, it became the stable boundary beneath both the current and legacy shells: serve files, provide configuration, perform Windows-only operations, and keep those operations observable through logs. 
