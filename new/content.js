@@ -1,6 +1,15 @@
 // L1 Ticket Autofill - Focus Map (Global version for console paste)
 // Paste this entire block into the browser console on the ManageEngine page.
 
+var AF_APP_VERSION = (function() {
+    try {
+        var manifest = chrome.runtime.getManifest();
+        return manifest.version_name || manifest.version || '';
+    } catch (e) {
+        return '';
+    }
+})();
+
 // ====================================================================
 // STATE (global, accessible from console)
 // ====================================================================
@@ -516,7 +525,7 @@ function AF_createHUD() {
 
     hud.innerHTML = [
         '<div id="af-header" style="box-sizing:border-box;padding:10px 12px;background:linear-gradient(180deg,#f8fbff 0%,#eef5ff 100%);border-bottom:1px solid #dbe7f7;color:#172033;font-weight:700;font-size:12.5px;letter-spacing:-0.12px;cursor:move;display:flex;align-items:center;justify-content:space-between">',
-        ' <span style="display:flex;align-items:center;gap:8px"><span style="display:block;width:9px;height:9px;border-radius:50%;background:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,0.12)"></span>Ticket Autofill</span>',
+        ' <span style="display:flex;align-items:center;gap:8px"><span style="display:block;width:9px;height:9px;border-radius:50%;background:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,0.12)"></span>Ticket Autofill' + (AF_APP_VERSION ? ' <small style="color:#64748b;font-weight:600">v' + AF_APP_VERSION + '</small>' : '') + '</span>',
         ' <button id="af-min" type="button" aria-label="Minimize" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;background:#ffffff;color:#526076;border:1px solid #cbd7e6;border-radius:7px;font-family:inherit;font-size:15px;line-height:1;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,0.05)">&#8722;</button>',
         '</div>',
         '<div id="af-body" style="box-sizing:border-box;padding:12px;background:#ffffff">',

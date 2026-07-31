@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ticket Generator v2.1</title>
+<title>Ticket Generator</title>
 <style>
 :root {
     /* Surfaces */
@@ -785,7 +785,7 @@ select option { background: var(--bg); color: var(--text); }
     <aside class="sidebar">
         <div class="sidebar-brand">
             <div class="logo">Ticket<br>Generator</div>
-            <div class="version">v2.1 &mdash; server edition</div>
+            <div class="version" id="appVersion">Loading version&hellip;</div>
         </div>
         <nav class="nav-group">
             <div class="nav-label">Workspace</div>
@@ -2492,6 +2492,12 @@ async function init() {
         const data = await api('/api/config');
         if (!data.ok) { setStatus('Config load failed.', 'var(--danger)'); return; }
         CFG = data;
+
+        const versionLabel = CFG.appVersion
+            ? `v${String(CFG.appVersion).replace(/^v/i, '')}`
+            : 'version unavailable';
+        byId('appVersion').textContent = `${versionLabel} — server edition`;
+        document.title = `Ticket Generator ${versionLabel}`;
 
         if (CFG.fields?.ticket) buildFields('ticketFieldsGrid', CFG.fields.ticket);
 

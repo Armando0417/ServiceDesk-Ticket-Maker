@@ -1,7 +1,8 @@
 {
     "manifest_version": 3,
     "name": "Ticket Autofill V2 - Automatic",
-    "version": "2.0.0",
+    "version": "3.6.2026.731",
+    "version_name": "3.6.0+20260731",
     "description": "Automatically fills ManageEngine ServiceDesk fields from clipboard JSON, with focus-based fallback.",
     "content_scripts": [
         {

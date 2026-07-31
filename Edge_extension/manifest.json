@@ -1,7 +1,8 @@
 {
     "manifest_version": 3,
     "name": "Ticket Autofill",
-    "version": "1.0",
+    "version": "3.6.2026.731",
+    "version_name": "3.6.0+20260731",
     "description": "Auto-fills ManageEngine ServiceDesk fields from clipboard JSON. Tab/click into fields to fill them.",
     "content_scripts": [
         {
