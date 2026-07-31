@@ -1,5 +1,4 @@
-// L1 Ticket Autofill - Focus Map (Global version for console paste)
-// Paste this entire block into the browser console on the ManageEngine page.
+// L1 Ticket Autofill Alt - automatic queue with focus-based fallback.
 
 var AF_APP_VERSION = (function() {
     try {
@@ -20,6 +19,29 @@ var AF_filled = {};
 var AF_pending = {};
 var AF_active = false;
 var AF_loadId = 0;
+var AF_autoEnabled = true;
+var AF_autoRunning = false;
+var AF_autoRerun = false;
+var AF_autoTimer = null;
+var AF_autoPass = 0;
+var AF_autoAttempts = {};
+var AF_AUTO_MAX_PASSES = 10;
+var AF_AUTO_SELECT_ORDER = [
+    'requester',
+    'category',
+    'subcategory',
+    'item',
+    'technician',
+    'group',
+    'site',
+    'mode',
+    'request_type',
+    'impact',
+    'urgency',
+    'udf_fields_udf_pick_2404',
+    'status',
+    'closure_info_closure_code'
+];
 
 // ====================================================================
 // FIELD MAP
@@ -134,8 +156,8 @@ function AF_identify(el) {
 // ====================================================================
 // FILL FUNCTIONS
 // ====================================================================
-function AF_fillText(el, value) {
-    el.focus();
+function AF_fillText(el, value, shouldFocus) {
+    if (shouldFocus !== false) el.focus();
     el.value = value;
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -392,20 +414,347 @@ function AF_fillRich(el, value) {
     return AF_setRichContent(iframe, wrapper, value);
 }
 
-function AF_fillTA(el, value) {
+function AF_fillTA(el, value, shouldFocus) {
     var ta = el.tagName === 'TEXTAREA' ? el : null;
     if (!ta) {
         var h = el.closest('.control-holder');
         if (h) ta = h.querySelector('textarea');
     }
     if (ta) {
-        ta.focus();
+        if (shouldFocus !== false) ta.focus();
         ta.value = value;
         ta.dispatchEvent(new Event('input', { bubbles: true }));
         ta.dispatchEvent(new Event('change', { bubbles: true }));
         return true;
     }
     return false;
+}
+
+// ====================================================================
+// AUTOMATIC FIELD DISCOVERY + SEQUENTIAL AUTOFILL (ALT)
+// ====================================================================
+function AF_dottedKey(key) {
+    if (key.indexOf('udf_fields_') === 0) {
+        return 'udf_fields.' + key.substring('udf_fields_'.length);
+    }
+    if (key.indexOf('closure_info_') === 0) {
+        return 'closure_info.' + key.substring('closure_info_'.length);
+    }
+    return key;
+}
+
+function AF_findSelect2Container(key) {
+    var dotted = AF_dottedKey(key);
+    var ids = ['s2id_for_' + dotted, 's2id_for_' + key];
+    for (var i = 0; i < ids.length; i++) {
+        var byId = document.getElementById(ids[i]);
+        if (byId) return byId;
+    }
+
+    var holders = document.querySelectorAll('[data-atm]');
+    for (var h = 0; h < holders.length; h++) {
+        var atm = (holders[h].getAttribute('data-atm') || '').replace(/\./g, '_');
+        if (atm !== key) continue;
+        return holders[h].querySelector('[id^="s2id_for_"], .select2-container');
+    }
+    return null;
+}
+
+function AF_findAutomaticElement(key, type) {
+    if (type === 's2') return AF_findSelect2Container(key);
+
+    if (type === 'rich') {
+        var editors = document.querySelectorAll('.sdp-zeditor-ovwrt');
+        var needle = key === 'description' ? 'description' : 'resolution';
+        for (var r = 0; r < editors.length; r++) {
+            if ((editors[r].id || '').toLowerCase().indexOf(needle) === -1) continue;
+            var iframe = editors[r].querySelector('iframe.ze_area');
+            if (iframe && iframe.contentDocument && iframe.contentDocument.body) return iframe;
+        }
+        return null;
+    }
+
+    var dotted = AF_dottedKey(key);
+    var ids = ['for_' + dotted, 'for_' + key, dotted, key];
+    for (var i = 0; i < ids.length; i++) {
+        var direct = document.getElementById(ids[i]);
+        if (direct) return direct;
+    }
+
+    var named = document.getElementsByName(dotted);
+    if (named.length) return named[0];
+    named = document.getElementsByName(key);
+    if (named.length) return named[0];
+
+    var holders = document.querySelectorAll('[data-atm]');
+    for (var h = 0; h < holders.length; h++) {
+        var atm = (holders[h].getAttribute('data-atm') || '').replace(/\./g, '_');
+        if (atm !== key) continue;
+        return holders[h].querySelector(type === 'ta' ? 'textarea' : 'input, textarea');
+    }
+    return null;
+}
+
+function AF_markFilled(key, source) {
+    AF_filled[key] = true;
+    delete AF_pending[key];
+    AF_updateHUD();
+    AF_log((source || 'Auto') + ': ' + AF_MAP[key].label);
+}
+
+function AF_autoFillSimple(key, loadId) {
+    if (loadId !== AF_loadId || AF_filled[key] || AF_pending[key]) return false;
+    var mapping = AF_MAP[key];
+    if (!mapping || mapping.type === 's2') return false;
+    var value = mapping.val(AF_data);
+    if (!value) return false;
+
+    var element = AF_findAutomaticElement(key, mapping.type);
+    if (!element) return false;
+
+    var success = false;
+    // Programmatic focus dispatches focusin synchronously. Mark the field as
+    // pending first so the legacy focus fallback does not fill it a second time.
+    AF_pending[key] = true;
+    if (mapping.type === 'text') success = AF_fillText(element, value, false);
+    else if (mapping.type === 'rich') success = AF_fillRich(element, value);
+    else if (mapping.type === 'ta') success = AF_fillTA(element, value, false);
+
+    delete AF_pending[key];
+    if (success) AF_markFilled(key, 'Auto-filled');
+    return success;
+}
+
+function AF_autoFillAvailableSimple(loadId) {
+    Object.keys(AF_MAP).forEach(function(key) {
+        AF_autoFillSimple(key, loadId);
+    });
+}
+
+function AF_waitFor(check, timeoutMs, loadId) {
+    return new Promise(function(resolve) {
+        var started = Date.now();
+        function poll() {
+            if (!AF_autoEnabled || loadId !== AF_loadId) { resolve(null); return; }
+            var result = null;
+            try { result = check(); } catch (_) {}
+            if (result) { resolve(result); return; }
+            if (Date.now() - started >= timeoutMs) { resolve(null); return; }
+            setTimeout(poll, 80);
+        }
+        poll();
+    });
+}
+
+function AF_normalizeOption(value) {
+    return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function AF_visibleSelect2Results() {
+    var nodes = document.querySelectorAll(
+        '#select2-drop .select2-result-selectable, ' +
+        '.select2-drop-active .select2-result-selectable'
+    );
+    return Array.prototype.filter.call(nodes, function(node) {
+        return AF_isVisible(node) &&
+            !node.classList.contains('select2-disabled') &&
+            !node.classList.contains('select2-no-results');
+    });
+}
+
+function AF_matchingSelect2Result(value) {
+    var expected = AF_normalizeOption(value);
+    var results = AF_visibleSelect2Results();
+    if (!results.length) return null;
+
+    var matches = results.filter(function(result) {
+        var actual = AF_normalizeOption(result.textContent);
+        return actual === expected ||
+            actual.indexOf(expected) !== -1 ||
+            expected.indexOf(actual) !== -1;
+    });
+    if (matches.length) {
+        matches.sort(function(a, b) {
+            return AF_normalizeOption(a.textContent).length -
+                AF_normalizeOption(b.textContent).length;
+        });
+        return matches[0];
+    }
+
+    // The search already constrained the remote result list. One unmatched
+    // result is safe; multiple unmatched results are left for the technician.
+    return results.length === 1 ? results[0] : null;
+}
+
+function AF_openSelect2(container) {
+    if (!container) return false;
+    var opener = container.querySelector(
+        '.select2-choice, .select2-focusser, .select2-container'
+    ) || container;
+    opener.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+    }));
+    opener.dispatchEvent(new MouseEvent('mouseup', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+    }));
+    if (typeof opener.click === 'function') opener.click();
+    return true;
+}
+
+function AF_closeSelect2(input) {
+    if (!input) return;
+    input.dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true,
+        key: 'Escape',
+        keyCode: 27,
+        which: 27
+    }));
+}
+
+async function AF_autoFillSelect2(key, loadId) {
+    if (loadId !== AF_loadId || AF_filled[key] || AF_pending[key]) return false;
+    var mapping = AF_MAP[key];
+    var value = mapping ? mapping.val(AF_data) : '';
+    if (!mapping || !value) return false;
+
+    var container = AF_findSelect2Container(key);
+    if (!container || !AF_isVisible(container)) return false;
+
+    var chosen = container.querySelector('.select2-chosen');
+    var expected = AF_normalizeOption(value);
+    var selected = AF_normalizeOption(chosen ? chosen.textContent : '');
+    if (selected && (
+        selected === expected ||
+        selected.indexOf(expected) !== -1 ||
+        expected.indexOf(selected) !== -1
+    )) {
+        AF_markFilled(key, 'Already selected');
+        return true;
+    }
+
+    AF_pending[key] = true;
+    AF_updateHUD();
+    AF_openSelect2(container);
+
+    var input = await AF_waitFor(function() {
+        return AF_findS2Search(key);
+    }, 2500, loadId);
+    if (!input) {
+        delete AF_pending[key];
+        return false;
+    }
+
+    AF_typeSearch(input, value);
+    var result = await AF_waitFor(function() {
+        return AF_matchingSelect2Result(value);
+    }, 3500, loadId);
+    if (!result) {
+        AF_closeSelect2(input);
+        delete AF_pending[key];
+        return false;
+    }
+
+    result.dispatchEvent(new MouseEvent('mouseup', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+    }));
+    if (typeof result.click === 'function') result.click();
+    await new Promise(function(resolve) { setTimeout(resolve, 300); });
+
+    if (loadId !== AF_loadId) {
+        delete AF_pending[key];
+        return false;
+    }
+    AF_markFilled(key, 'Auto-selected');
+    return true;
+}
+
+function AF_remainingAutoFields() {
+    if (!AF_data) return [];
+    return Object.keys(AF_MAP).filter(function(key) {
+        return AF_MAP[key].val(AF_data) && !AF_filled[key];
+    });
+}
+
+function AF_setAutoStatus(message, color) {
+    var status = document.getElementById('af-status');
+    if (!status) return;
+    status.style.color = color || AF_HUD_COLORS.textMuted;
+    status.textContent = message;
+}
+
+async function AF_runAutomaticFill(loadId) {
+    if (!AF_autoEnabled || !AF_active || !AF_data || loadId !== AF_loadId) return;
+    if (AF_autoRunning) {
+        AF_autoRerun = true;
+        return;
+    }
+    if (AF_autoPass >= AF_AUTO_MAX_PASSES) return;
+
+    AF_autoRunning = true;
+    AF_autoPass++;
+    AF_setAutoStatus('Auto-filling form… pass ' + AF_autoPass, AF_HUD_COLORS.primary);
+
+    try {
+        AF_autoFillAvailableSimple(loadId);
+
+        for (var index = 0; index < AF_AUTO_SELECT_ORDER.length; index++) {
+            if (!AF_autoEnabled || loadId !== AF_loadId) return;
+            var key = AF_AUTO_SELECT_ORDER[index];
+            if (AF_filled[key] || !AF_MAP[key].val(AF_data)) continue;
+            if ((AF_autoAttempts[key] || 0) >= 2) continue;
+            if (!AF_findSelect2Container(key)) continue;
+
+            AF_autoAttempts[key] = (AF_autoAttempts[key] || 0) + 1;
+            await AF_autoFillSelect2(key, loadId);
+            AF_autoFillAvailableSimple(loadId);
+        }
+
+        AF_autoFillAvailableSimple(loadId);
+        var remaining = AF_remainingAutoFields();
+        if (!remaining.length) {
+            AF_setAutoStatus('Auto-fill complete.', AF_HUD_COLORS.success);
+            AF_log('Automatic fill complete');
+        } else if (AF_autoPass < AF_AUTO_MAX_PASSES) {
+            AF_setAutoStatus(
+                'Auto-filled available fields; waiting for ' + remaining.length + ' field(s)…',
+                AF_HUD_COLORS.textMuted
+            );
+            AF_scheduleAutomaticFill(900);
+        } else {
+            AF_setAutoStatus(
+                'Auto-fill paused. Click a remaining field or press Retry.',
+                AF_HUD_COLORS.textMuted
+            );
+        }
+    } finally {
+        AF_autoRunning = false;
+        if (AF_autoRerun) {
+            AF_autoRerun = false;
+            AF_scheduleAutomaticFill(100);
+        }
+    }
+}
+
+function AF_scheduleAutomaticFill(delayMs) {
+    if (!AF_autoEnabled || !AF_active) return;
+    clearTimeout(AF_autoTimer);
+    var loadId = AF_loadId;
+    AF_autoTimer = setTimeout(function() {
+        AF_runAutomaticFill(loadId);
+    }, delayMs == null ? 150 : delayMs);
+}
+
+function AF_retryAutomaticFill() {
+    if (!AF_data) return;
+    AF_autoPass = 0;
+    AF_autoAttempts = {};
+    AF_scheduleAutomaticFill(0);
 }
 
 // ====================================================================
@@ -521,18 +870,20 @@ function AF_createHUD() {
 
     var hud = document.createElement('div');
     hud.id = 'af-hud';
-    // Explicit light color-scheme prevents ServiceDesk's theme styles from
-    // leaking dark native-control colors into the injected HUD.
     hud.style.cssText = 'position:fixed;top:40px;right:12px;width:286px;box-sizing:border-box;color-scheme:light;background:#ffffff;border:1px solid #d8e0eb;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;font-size:12px;line-height:1.45;color:#172033;z-index:999999;box-shadow:0 2px 4px rgba(15,23,42,0.06),0 12px 28px rgba(15,23,42,0.14);overflow:hidden';
 
     hud.innerHTML = [
         '<div id="af-header" style="box-sizing:border-box;padding:10px 12px;background:linear-gradient(180deg,#f8fbff 0%,#eef5ff 100%);border-bottom:1px solid #dbe7f7;color:#172033;font-weight:700;font-size:12.5px;letter-spacing:-0.12px;cursor:move;display:flex;align-items:center;justify-content:space-between">',
-        ' <span style="display:flex;align-items:center;gap:8px"><span style="display:block;width:9px;height:9px;border-radius:50%;background:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,0.12)"></span>Ticket Autofill' + (AF_APP_VERSION ? ' <small style="color:#64748b;font-weight:600">v' + AF_APP_VERSION + '</small>' : '') + '</span>',
+        ' <span style="display:flex;align-items:center;gap:8px"><span style="display:block;width:9px;height:9px;border-radius:50%;background:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,0.12)"></span>Ticket Autofill Alt' + (AF_APP_VERSION ? ' <small style="color:#64748b;font-weight:600">v' + AF_APP_VERSION + '</small>' : '') + '</span>',
         ' <button id="af-min" type="button" aria-label="Minimize" style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;background:#ffffff;color:#526076;border:1px solid #cbd7e6;border-radius:7px;font-family:inherit;font-size:15px;line-height:1;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,0.05)">&#8722;</button>',
         '</div>',
         '<div id="af-body" style="box-sizing:border-box;padding:12px;background:#ffffff">',
         ' <div id="af-status" style="box-sizing:border-box;padding:7px 9px;margin-bottom:9px;background:#f7f9fc;color:#526076;border:1px solid #e3e8f0;border-radius:8px;font-size:11px;font-weight:600">No data loaded</div>',
-        ' <button id="af-load" type="button" style="display:block;width:100%;box-sizing:border-box;padding:8px 10px;margin:0 0 10px;background:#2563eb;color:#ffffff;border:1px solid #1d4ed8;border-radius:8px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(37,99,235,0.22),0 4px 10px rgba(37,99,235,0.16)">Load from Clipboard</button>',
+        ' <button id="af-load" type="button" style="display:block;width:100%;box-sizing:border-box;padding:8px 10px;margin:0 0 8px;background:#2563eb;color:#ffffff;border:1px solid #1d4ed8;border-radius:8px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(37,99,235,0.22),0 4px 10px rgba(37,99,235,0.16)">Load + Auto-fill</button>',
+        ' <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px">',
+        '  <label style="display:flex;align-items:center;gap:6px;color:#526076;font-size:10.5px;font-weight:600;cursor:pointer"><input id="af-auto" type="checkbox" checked style="width:14px;height:14px;margin:0;accent-color:#2563eb"> Automatic mode</label>',
+        '  <button id="af-retry" type="button" style="padding:4px 8px;background:#ffffff;color:#2563eb;border:1px solid #c5d0df;border-radius:6px;font-family:inherit;font-size:10px;font-weight:700;cursor:pointer">Retry</button>',
+        ' </div>',
         ' <div style="color:#526076;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.45px;margin-bottom:5px">Or paste JSON</div>',
         ' <textarea id="af-paste" aria-label="Paste ticket JSON" placeholder="{ &quot;name&quot;: &quot;...&quot; }" style="display:block;width:100%;height:54px;box-sizing:border-box;background:#f7f9fc;color:#172033;caret-color:#2563eb;border:1px solid #c5d0df;border-radius:8px;padding:7px 8px;outline:none;font-family:Consolas,monospace;font-size:10px;line-height:1.4;resize:vertical;margin:0 0 9px"></textarea>',
         ' <div id="af-fields" style="box-sizing:border-box;max-height:190px;overflow-y:auto;margin-bottom:9px;background:#f7f9fc;border:1px solid #e3e8f0;border-radius:8px;padding:3px 6px"></div>',
@@ -549,6 +900,12 @@ function AF_createHUD() {
     });
 
     document.getElementById('af-load').addEventListener('click', AF_loadClipboard);
+    document.getElementById('af-retry').addEventListener('click', AF_retryAutomaticFill);
+    document.getElementById('af-auto').addEventListener('change', function() {
+        AF_autoEnabled = this.checked;
+        if (AF_autoEnabled) AF_retryAutomaticFill();
+        else AF_setAutoStatus('Automatic mode off — click/tab fields to fill.');
+    });
 
     var loadButton = document.getElementById('af-load');
     loadButton.addEventListener('mouseenter', function() {
@@ -629,11 +986,17 @@ function AF_loadData(data) {
     AF_pending = {};
     AF_loadId++;
     AF_active = true;
+    AF_autoPass = 0;
+    AF_autoAttempts = {};
+    AF_autoRerun = false;
     var st = document.getElementById('af-status');
     if (st) { st.style.color = AF_HUD_COLORS.success; st.textContent = 'Loaded: ' + (data.name || data.user || 'ticket'); }
     AF_updateHUD();
-    AF_log('Data loaded - click/tab fields to fill');
+    AF_log(AF_autoEnabled
+        ? 'Data loaded - automatic fill starting'
+        : 'Data loaded - click/tab fields to fill');
     console.log('[AF] Data loaded:', data.name || data.user);
+    AF_scheduleAutomaticFill(100);
 }
 
 async function AF_loadClipboard() {
@@ -651,249 +1014,16 @@ async function AF_loadClipboard() {
 }
 
 // ====================================================================
-// DAY EXPORT (auto-run)
-// The local Ticket Generator opens a ServiceDesk tab with
-// #af-export=<urlencoded json> ({date, start, end}) in the URL.
-// The request is parked in sessionStorage so it survives the login
-// redirect, then runs here — on the ServiceDesk origin, with the
-// user's session — and downloads the workday JSON automatically.
-// ====================================================================
-var AF_EXPORT_KEY = 'af_day_export';
-var AF_exportRunning = false;
-
-var AF_EXPORT_CFG = {
-    filterId: "302",
-    pageSize: 100,
-    maxPages: 100,
-    fields: [
-        "id", "subject", "short_description", "created_time", "created_by",
-        "responded_time", "completed_time", "resolved_time", "due_by_time",
-        "requester", "technician", "priority", "site", "status", "group",
-        "template", "category", "is_service_request", "is_overdue",
-        "is_first_response_overdue", "is_fcr", "has_notes", "has_attachments"
-    ]
-};
-
-function AF_exportStatus(msg, color) {
-    var st = document.getElementById('af-status');
-    if (st) { st.style.color = color || '#64748b'; st.textContent = msg; }
-    console.log('[AF] ' + msg);
-}
-
-function AF_captureExportRequest() {
-    var m = location.hash.match(/af-export=([^&]+)/);
-    if (!m) return;
-    try {
-        var params = JSON.parse(decodeURIComponent(m[1]));
-        if (params && params.date) sessionStorage.setItem(AF_EXPORT_KEY, JSON.stringify(params));
-    } catch (e) {
-        console.log('[AF] Ignoring bad export params:', e.message);
-    }
-    // Clean the hash so a refresh doesn't re-capture it
-    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
-}
-
-// Resolves true when finished, false when blocked on sign-in (retry later).
-async function AF_runDayExport(params) {
-    var CONFIG = AF_EXPORT_CFG;
-    var selectedDate = params.date;
-    var startHour = Number(params.start);
-    var endHour = Number(params.end);
-
-    if (!Number.isInteger(startHour) || !Number.isInteger(endHour) ||
-        startHour < 0 || startHour > 23 || endHour < 1 || endHour > 24 || endHour <= startHour) {
-        throw new Error('The workday hours are invalid.');
-    }
-
-    var dayStart = new Date(selectedDate + 'T00:00:00');
-    var rangeStart = new Date(dayStart);
-    var rangeEnd = new Date(dayStart);
-    rangeStart.setHours(startHour, 0, 0, 0);
-    rangeEnd.setHours(endHour, 0, 0, 0);
-
-    var startMs = rangeStart.getTime();
-    var endMs = rangeEnd.getTime();
-    if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
-        throw new Error('Invalid date. Enter it in YYYY-MM-DD format.');
-    }
-
-    console.log('[AF] Exporting tickets from ' + rangeStart.toLocaleString() +
-        ' through ' + rangeEnd.toLocaleString());
-
-    var downloadedRequests = [];
-    var startIndex = 1;
-    var pageNumber = 1;
-    var shouldContinue = true;
-
-    while (shouldContinue && pageNumber <= CONFIG.maxPages) {
-        var inputData = {
-            list_info: {
-                row_count: CONFIG.pageSize,
-                start_index: startIndex,
-                get_total_count: true,
-                sort_field: "created_time",
-                sort_order: "desc",
-                filter_by: { id: CONFIG.filterId },
-                fields_required: CONFIG.fields
-            },
-            for: "list_view_filter"
-        };
-
-        var query = new URLSearchParams({
-            input_data: JSON.stringify(inputData),
-            SUBREQUEST: "XMLHTTP",
-            _: Date.now().toString()
-        });
-
-        var url = '/api/v3/requests?' + query.toString();
-
-        AF_exportStatus('Export: downloading page ' + pageNumber +
-            ' (' + downloadedRequests.length + ' records so far)...', '#1a5fd0');
-
-        var response = await fetch(url, {
-            method: "GET",
-            credentials: "include",
-            headers: {
-                Accept: "application/vnd.manageengine.sdp.v3+json",
-                "X-Requested-With": "XMLHttpRequest"
-            },
-            cache: "no-store"
-        });
-
-        // Not signed in yet: the API answers 401/403, or the request is
-        // redirected to the HTML login page. Park the export and retry.
-        if (response.status === 401 || response.status === 403) return false;
-        var contentType = response.headers.get('content-type') || '';
-        if (contentType.indexOf('json') === -1) return false;
-
-        if (!response.ok) {
-            var body = await response.text();
-            throw new Error('ServiceDesk returned HTTP ' + response.status + '.\n' + body);
-        }
-
-        var data = await response.json();
-        var pageRequests = Array.isArray(data.requests) ? data.requests : [];
-
-        if (pageRequests.length === 0) {
-            console.log('[AF] No additional requests were returned.');
-            break;
-        }
-
-        downloadedRequests.push.apply(downloadedRequests, pageRequests);
-
-        var timestamps = pageRequests
-            .map(function(request) { return Number(request.created_time && request.created_time.value); })
-            .filter(Number.isFinite);
-        var oldestTimestamp = timestamps.length ? Math.min.apply(null, timestamps) : null;
-        var hasMoreRows = !!(data.list_info && data.list_info.has_more_rows === true);
-
-        console.log('[AF] Page ' + pageNumber + ': ' + pageRequests.length +
-            ' records. Total downloaded: ' + downloadedRequests.length + '.');
-
-        if (oldestTimestamp !== null && oldestTimestamp < startMs) {
-            console.log('[AF] Reached tickets older than the requested workday.');
-            shouldContinue = false;
-        } else if (!hasMoreRows) {
-            console.log('[AF] ServiceDesk reports no additional rows.');
-            shouldContinue = false;
-        } else {
-            startIndex += CONFIG.pageSize;
-            pageNumber += 1;
-        }
-    }
-
-    var requestsForWorkday = downloadedRequests.filter(function(request) {
-        var timestamp = Number(request.created_time && request.created_time.value);
-        return Number.isFinite(timestamp) && timestamp >= startMs && timestamp < endMs;
-    });
-
-    requestsForWorkday.sort(function(a, b) {
-        return Number(a.created_time && a.created_time.value) -
-               Number(b.created_time && b.created_time.value);
-    });
-
-    var output = {
-        export_metadata: {
-            generated_at: new Date().toISOString(),
-            source: location.origin,
-            endpoint: "/api/v3/requests",
-            filter_id: CONFIG.filterId,
-            selected_date: selectedDate,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            workday_start: rangeStart.toISOString(),
-            workday_end_exclusive: rangeEnd.toISOString(),
-            downloaded_record_count: downloadedRequests.length,
-            matching_record_count: requestsForWorkday.length
-        },
-        requests: requestsForWorkday
-    };
-
-    var json = JSON.stringify(output, null, 2);
-    var blob = new Blob([json], { type: "application/json;charset=utf-8" });
-    var downloadUrl = URL.createObjectURL(blob);
-    var link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = 'servicedesk-' + selectedDate + '-' + startHour + '-' + endHour + '.json';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(function() { URL.revokeObjectURL(downloadUrl); }, 1000);
-
-    console.log('[AF] Finished. Exported ' + requestsForWorkday.length + ' tickets.', output);
-    AF_exportStatus('Export complete: ' + requestsForWorkday.length + ' tickets for ' +
-        selectedDate + ', ' + startHour + ':00-' + endHour + ':00.', '#15803d');
-    return true;
-}
-
-function AF_exportPump() {
-    var raw = sessionStorage.getItem(AF_EXPORT_KEY);
-    if (!raw || AF_exportRunning) return;
-
-    var params;
-    try { params = JSON.parse(raw); } catch (e) {
-        sessionStorage.removeItem(AF_EXPORT_KEY);
-        return;
-    }
-
-    AF_exportRunning = true;
-    AF_runDayExport(params).then(function(finished) {
-        AF_exportRunning = false;
-        if (finished) {
-            sessionStorage.removeItem(AF_EXPORT_KEY);
-        } else {
-            AF_exportStatus('Export queued - sign in to ServiceDesk and it will run automatically.', '#d97706');
-            setTimeout(AF_exportPump, 10000);
-        }
-    }).catch(function(error) {
-        AF_exportRunning = false;
-        sessionStorage.removeItem(AF_EXPORT_KEY);
-        console.error('[AF] ServiceDesk export failed:', error);
-        AF_exportStatus('Export failed: ' + error.message, '#dc2626');
-    });
-}
-
-// ====================================================================
 // INIT
 // ====================================================================
-// Capture the export instruction immediately. ServiceDesk is a hash-routed
-// app and may rewrite location.hash before a document_idle script can read it.
-AF_captureExportRequest();
-
-// The manifest runs this script at document_start so the hash is safe, but
-// the HUD needs document.body. Initialize only the UI when the DOM is ready.
-function AF_startUI() {
-    if (!document.body) {
-        setTimeout(AF_startUI, 50);
-        return;
-    }
-    AF_createHUD();
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', AF_startUI, { once: true });
-} else {
-    AF_startUI();
-}
-
-setTimeout(AF_exportPump, 1500);
-console.log('[AF] Focus-map autofill ready. Load JSON and tab through the form.');
+AF_createHUD();
+var AF_autoObserver = new MutationObserver(function(records) {
+    if (!AF_autoEnabled || !AF_active || AF_autoPass >= AF_AUTO_MAX_PASSES) return;
+    var relevant = records.some(function(record) {
+        var target = record.target && record.target.nodeType === 1 ? record.target : null;
+        return !target || !target.closest('#af-hud');
+    });
+    if (relevant) AF_scheduleAutomaticFill(250);
+});
+AF_autoObserver.observe(document.body, { childList: true, subtree: true });
+console.log('[AF ALT] Automatic autofill ready. Load JSON to begin.');

@@ -1,5 +1,10 @@
 {
+    "appVersion": "3.6.2026.731",
+    "displayVersion": "3.6",
     "technician": "Armando",
+
+    "_comment_quickRequestSuffix": "Appended to the header line of every Quick Request output. Leading space is intentional. Set to \"\" to disable.",
+    "quickRequestSuffix": " (Elevance)",
 
     "quickActions": {
         "reset":  "Password Reset",
@@ -7,33 +12,51 @@
         "okta":   "Okta Unpair"
     },
 
+    "_comment_dropdowns": "Each dropdown declares its own label and outputKey. 'ticketType' is special-cased: it renders in the Preset card and emits as 'ticket_type'. Everything else renders in the Dropdowns card and emits under its outputKey. Add a new entry here and it appears in the UI and the output JSON with no code changes.",
+
     "dropdowns": {
-        "ticketType":   ["Incident", "Request"],
-        "status":       ["Open", "closed", "Onhold"],
-        "locationArea": [
-            "Remoto", 
-            "New Port 2 Piso 1",
-            "New Port 2 Piso 2",
-            "New Port 2 Piso 3",
-            "Kennedy Piso 1",
-            "Kennedy Piso 2",
-            "Kennedy Piso 3",
-            "Kennedy Piso 4",
-            "Kennedy Piso 5"
-            ] ,
-        "closureCode":  ["Success", "Unable to Reproduce"]
+        "ticketType": {
+            "label": "Ticket Type",
+            "outputKey": "ticket_type",
+            "options": ["Incident", "Request"]
+        },
+        "status": {
+            "label": "Status",
+            "outputKey": "_status",
+            "options": ["Open", "closed", "Onhold"]
+        },
+        "locationArea": {
+            "label": "Location Area",
+            "outputKey": "_locationArea",
+            "options": [
+                "Remoto",
+                "New Port 2 Piso 1",
+                "New Port 2 Piso 2",
+                "New Port 2 Piso 3",
+                "Kennedy Piso 1",
+                "Kennedy Piso 2",
+                "Kennedy Piso 3",
+                "Kennedy Piso 4",
+                "Kennedy Piso 5"
+            ]
+        },
+        "closureCode": {
+            "label": "Closure Code",
+            "outputKey": "_closureCode",
+            "options": ["Success", "Unable to Reproduce"]
+        }
     },
 
     "fields": {
         "ticket": [
-            { "id": "txtName",     "label": "Name",           "type": "text",   "placeholder": "Display name" },
-            { "id": "txtUser",     "label": "Username",       "type": "text",   "placeholder": "sAMAccountName" },
-            { "id": "txtDept",     "label": "Department",     "type": "text" },
-            { "id": "txtLocation", "label": "Location",       "type": "text" },
-            { "id": "txtContact",  "label": "Contact Number", "type": "text",   "placeholder": "7871234567" },
-            { "id": "txtEmail",    "label": "Email",          "type": "text" },
-            { "id": "txtTopic",    "label": "Topic",          "type": "text" },
-            { "id": "txtTechnician","label": "Technician",    "type": "text" }
+            { "id": "txtName",      "label": "Name",           "type": "text", "placeholder": "Display name" },
+            { "id": "txtUser",      "label": "Username",       "type": "text", "placeholder": "sAMAccountName" },
+            { "id": "txtDept",      "label": "Department",     "type": "text" },
+            { "id": "txtLocation",  "label": "Location",       "type": "text" },
+            { "id": "txtContact",   "label": "Contact Number", "type": "text", "placeholder": "7871234567" },
+            { "id": "txtEmail",     "label": "Email",          "type": "text" },
+            { "id": "txtTopic",     "label": "Topic",          "type": "text" },
+            { "id": "txtTechnician","label": "Technician",     "type": "text" }
         ],
         "request": [
             { "id": "txtReqName", "label": "Name",     "type": "text" },
@@ -52,12 +75,11 @@
     ],
 
     "adMapping": {
-        "DisplayName":       "txtName",
-        "SamAccountName":    "txtUser",
-        "mail":              "txtEmail",
-        "Department":        "txtDept",
-        "Office":            "txtLocation",
-        "oktaUser":          "txtReqOkta"
+        "DisplayName":    "txtName",
+        "SamAccountName": "txtUser",
+        "mail":           "txtEmail",
+        "Department":     "txtDept",
+        "Office":         "txtLocation",
+        "oktaUser":       "txtReqOkta"
     }
 }
-

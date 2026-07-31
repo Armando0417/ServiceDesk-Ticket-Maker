@@ -1,21 +1,22 @@
 {
     "manifest_version": 3,
-    "name": "Ticket Autofill V2 - Automatic",
+    "name": "Ticket Autofill",
     "version": "3.6.2026.731",
     "version_name": "3.6.2026.731",
-    "description": "Automatically fills ManageEngine ServiceDesk fields from clipboard JSON, with focus-based fallback.",
+    "description": "Auto-fills ManageEngine ServiceDesk fields from clipboard JSON. Tab/click into fields to fill them.",
     "content_scripts": [
         {
             "matches": [
                 "https://servicedesk.mmmhc.com/*"
             ],
-            "js": [
-                "content.js"
-            ],
+            "js": ["content.js"],
             "run_at": "document_idle"
         }
     ],
     "permissions": [
         "clipboardRead"
-    ]
+    ],
+    "icons": {
+        "48": "icon.png"
+    }
 }

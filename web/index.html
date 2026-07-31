@@ -1,1452 +1,3086 @@
 <!DOCTYPE html>
- 
 <html lang="en">
- <head>
- <meta charset="UTF-8">
- <meta name="viewport" content="width=device-width, initial-scale=1.0">
- <title>Ticket Generator v2.0</title>
- <style>
- :root {
-     /* Surfaces — proper depth hierarchy */
-     --bg: #ffffff;                /* cards & elevated surfaces */
-     --page: #f3f5f9;              /* main page background */
-     --sidebar: #fafbfd;           /* sidebar — between page and card */
-     --bg-subtle: #f7f9fc;
-     --surface: #eef1f6;
-     --surface-up: #e4e8ef;
-     --surface-hi: #d6dce6;
-     
-     /* Borders */
-     --border: #e2e6ec;
-     --border-hi: #cbd2dc;
-     --border-strong: #a8b1bf;
-     
-     /* Accent — refined SaaS blue */
-     --accent: #2e7cf6;
-     --accent-hover: #1f6ae8;
-     --accent-deep: #1a5fd0;
-     --accent-soft: rgba(46, 124, 246, 0.10);
-     --accent-glow: rgba(46, 124, 246, 0.06);
-     --accent-ring: rgba(46, 124, 246, 0.22);
-     --accent-gradient: linear-gradient(135deg, #4a90ff 0%, #2e7cf6 50%, #5b5bd6 100%);
-     
-     /* Text — darker scale for readability */
-     --text: #0a0f1c;
-     --text-strong: #04070d;
-     --text-muted: #334155;        /* darkened — was #475569 */
-     --text-mid: #475569;          /* darkened — was #64748b */
-     --text-dim: #64748b;          /* darkened — was #94a3b8 */
-     --text-faint: #94a3b8;        /* darkened — was #cbd5e1 */
-     
-     /* Semantic */
-     --success: #15803d;
-     --success-soft: rgba(21, 128, 61, 0.12);
-     --warning: #d97706;
-     --danger: #dc2626;
-     --danger-soft: rgba(220, 38, 38, 0.09);
-     
-     /* Shadows — stronger, more confident */
-     --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
-     --shadow-sm:
-         0 1px 2px rgba(15, 23, 42, 0.05),
-         0 2px 4px rgba(15, 23, 42, 0.04);
-     --shadow-md:
-         0 1px 2px rgba(15, 23, 42, 0.06),
-         0 4px 8px -2px rgba(15, 23, 42, 0.08),
-         0 8px 16px -4px rgba(15, 23, 42, 0.06);
-     --shadow-lg:
-         0 1px 2px rgba(15, 23, 42, 0.06),
-         0 8px 16px -4px rgba(15, 23, 42, 0.1),
-         0 20px 32px -8px rgba(15, 23, 42, 0.12);
-     --shadow-card:
-         0 1px 2px rgba(15, 23, 42, 0.04),
-         0 2px 4px rgba(15, 23, 42, 0.04),
-         0 6px 12px -2px rgba(15, 23, 42, 0.06);
-     --shadow-card-hover:
-         0 2px 4px rgba(15, 23, 42, 0.05),
-         0 8px 16px -4px rgba(15, 23, 42, 0.1),
-         0 16px 32px -8px rgba(15, 23, 42, 0.1);
-     --shadow-accent:
-         inset 0 1px 0 rgba(255, 255, 255, 0.22),
-         0 1px 2px rgba(46, 124, 246, 0.4),
-         0 4px 10px -2px rgba(46, 124, 246, 0.4),
-         0 8px 20px -4px rgba(46, 124, 246, 0.25);
-     --shadow-accent-hover:
-         inset 0 1px 0 rgba(255, 255, 255, 0.18),
-         0 1px 2px rgba(46, 124, 246, 0.45),
-         0 6px 14px -2px rgba(46, 124, 246, 0.5),
-         0 12px 28px -6px rgba(46, 124, 246, 0.35);
-     --shadow-inset:
-         inset 0 1px 2px rgba(15, 23, 42, 0.06),
-         inset 0 0 0 1px rgba(15, 23, 42, 0.01);
-     
-     /* Radii */
-     --r-xs: 5px;
-     --r-sm: 7px;
-     --r: 10px;
-     --r-md: 12px;
-     --r-lg: 16px;
-     
-     /* Typography */
-     --mono: 'SF Mono', 'JetBrains Mono', 'Monaco', 'Consolas', monospace;
-     --body: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Helvetica Neue', sans-serif;
-     
-     /* Motion */
-     --ease: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-     --ease-out: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-     --ease-spring: 0.4s cubic-bezier(0.34, 1.4, 0.64, 1);
- }
- 
- *,*::before,*::after {
-     box-sizing: border-box;
-     margin: 0;
-     padding: 0;
- }
- 
- html {
-     scroll-behavior: smooth;
- }
- 
- body {
-     font-family: var(--body);
-     font-size: 14px;
-     background: var(--page);
-     color: var(--text);
-     min-height: 100vh;
-     line-height: 1.55;
-     -webkit-font-smoothing: antialiased;
-     -moz-osx-font-smoothing: grayscale;
-     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
- }
- 
- ::selection {
-     background: var(--accent-soft);
-     color: var(--accent-deep);
- }
- 
- ::-webkit-scrollbar {
-     width: 10px;
-     height: 10px;
- }
- 
- ::-webkit-scrollbar-track {
-     background: transparent;
- }
- 
- ::-webkit-scrollbar-thumb {
-     background: #d4d8de;
-     border-radius: 10px;
-     border: 3px solid var(--bg);
- }
- 
- ::-webkit-scrollbar-thumb:hover {
-     background: #b8bdc4;
- }
- 
- /* ── Layout ── */
- .app {
-     display: grid;
-     grid-template-columns: 256px 1fr;
-     min-height: 100vh;
- }
- 
- /* ── Sidebar ── */
- .sidebar {
-     background: var(--sidebar);
-     border-right: 1px solid var(--border);
-     padding: 24px 0;
-     display: flex;
-     flex-direction: column;
-     position: sticky;
-     top: 0;
-     height: 100vh;
- }
- 
- .sidebar-brand {
-     padding: 4px 20px 24px;
-     border-bottom: 1px solid var(--border);
-     margin-bottom: 20px;
-     position: relative;
- }
- 
- .sidebar-brand::before {
-     content: '';
-     display: block;
-     width: 34px;
-     height: 34px;
-     background: var(--accent-gradient);
-     border-radius: 9px;
-     margin-bottom: 14px;
-     box-shadow:
-         0 1px 2px rgba(46, 124, 246, 0.3),
-         0 6px 16px -4px rgba(91, 91, 214, 0.45),
-         inset 0 1px 0 rgba(255, 255, 255, 0.25),
-         inset 0 -1px 0 rgba(0, 0, 0, 0.08);
-     position: relative;
- }
- 
- .sidebar-brand::after {
-     content: '';
-     position: absolute;
-     top: 13px;
-     left: 28px;
-     width: 12px;
-     height: 12px;
-     border: 2px solid rgba(255, 255, 255, 0.95);
-     border-radius: 3px;
-     box-sizing: border-box;
- }
- 
- .sidebar-brand .logo {
-     font-family: var(--body);
-     font-size: 15px;
-     font-weight: 700;
-     color: var(--text-strong);
-     letter-spacing: -0.32px;
-     line-height: 1.25;
- }
- 
- .sidebar-brand .version {
-     font-family: var(--mono);
-     font-size: 11px;
-     color: var(--text-dim);
-     margin-top: 6px;
-     font-weight: 500;
-     letter-spacing: -0.1px;
- }
- 
- .nav-group {
-     padding: 0 12px;
- }
- 
- .nav-label {
-     font-family: var(--body);
-     font-size: 11px;
-     font-weight: 600;
-     color: var(--text-dim);
-     text-transform: uppercase;
-     letter-spacing: 0.6px;
-     padding: 8px 12px 10px;
-     margin-bottom: 2px;
- }
- 
- .nav-item {
-     display: flex;
-     align-items: center;
-     gap: 11px;
-     padding: 8px 10px;
-     border-radius: var(--r-sm);
-     cursor: pointer;
-     font-size: 13.5px;
-     font-weight: 500;
-     color: var(--text-muted);
-     transition: background var(--ease), color var(--ease);
-     position: relative;
-     border: none;
-     margin-bottom: 2px;
-     letter-spacing: -0.1px;
- }
- 
- .nav-item:hover {
-     background: var(--surface-up);
-     color: var(--text);
- }
- 
- .nav-item:hover .nav-icon {
-     border-color: var(--border-hi);
-     color: var(--text);
-     box-shadow: var(--shadow-sm);
- }
- 
- .nav-item.active {
-     background: var(--accent-soft);
-     color: var(--accent-deep);
-     font-weight: 600;
- }
- 
- .nav-item.active::before {
-     content: '';
-     position: absolute;
-     left: -12px;
-     top: 50%;
-     transform: translateY(-50%);
-     width: 3px;
-     height: 18px;
-     background: var(--accent);
-     border-radius: 0 3px 3px 0;
- }
- 
- .nav-item.active .nav-icon {
-     background: var(--accent);
-     color: white;
-     border-color: var(--accent);
-     box-shadow: 0 1px 2px var(--accent-ring), inset 0 1px 0 rgba(255, 255, 255, 0.2);
- }
- 
- .nav-icon {
-     width: 26px;
-     height: 26px;
-     display: flex;
-     align-items: center;
-     justify-content: center;
-     font-family: var(--mono);
-     font-size: 11px;
-     font-weight: 700;
-     flex-shrink: 0;
-     background: var(--bg);
-     color: var(--text-mid);
-     border: 1px solid var(--border);
-     border-radius: 6px;
-     box-shadow: var(--shadow-xs);
-     transition: all var(--ease);
-     letter-spacing: -0.3px;
- }
- 
- .sidebar-footer {
-     margin-top: auto;
-     padding: 16px 20px;
-     border-top: 1px solid var(--border);
- }
- 
- .conn-dot {
-     display: inline-flex;
-     align-items: center;
-     gap: 9px;
-     font-family: var(--body);
-     font-size: 12px;
-     color: var(--text-muted);
-     font-weight: 500;
-     letter-spacing: -0.1px;
- }
- 
- .conn-dot::before {
-     content: '';
-     width: 8px;
-     height: 8px;
-     border-radius: 50%;
-     background: var(--warning);
-     transition: all var(--ease);
-     box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
- }
- 
- .conn-dot.ok::before {
-     background: var(--success);
-     box-shadow: 0 0 0 3px var(--success-soft);
-     animation: pulse 2.5s ease-in-out infinite;
- }
- 
- @keyframes pulse {
-     0%, 100% { box-shadow: 0 0 0 3px var(--success-soft); }
-     50%      { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0.06); }
- }
- 
- /* ── Main ── */
- .main {
-     padding: 44px 56px 90px;
-     overflow-y: auto;
-     max-height: 100vh;
-     position: relative;
-     background:
-         radial-gradient(circle at 0% 0%, rgba(46, 124, 246, 0.04) 0%, transparent 35%),
-         radial-gradient(circle at 100% 0%, rgba(91, 91, 214, 0.03) 0%, transparent 40%),
-         var(--page);
- }
- 
- .page-header {
-     margin-bottom: 32px;
-     position: relative;
- }
- 
- .page-header h2 {
-     font-size: 28px;
-     font-weight: 700;
-     margin-bottom: 6px;
-     color: var(--text-strong);
-     letter-spacing: -0.8px;
-     line-height: 1.2;
- }
- 
- .page-header .desc {
-     font-size: 15px;
-     color: var(--text-mid);
-     font-weight: 400;
-     letter-spacing: -0.15px;
-     max-width: 640px;
-     line-height: 1.55;
- }
- 
- /* ── Panels ── */
- .panel {
-     display: none;
- }
- 
- .panel.active {
-     display: block;
- }
- 
- .panel.active .page-header { animation: fadeUp 0.45s var(--ease-out) both; }
- .panel.active .card:nth-of-type(1) { animation: fadeUp 0.45s var(--ease-out) 0.04s both; }
- .panel.active .card:nth-of-type(2) { animation: fadeUp 0.45s var(--ease-out) 0.08s both; }
- .panel.active .card:nth-of-type(3) { animation: fadeUp 0.45s var(--ease-out) 0.12s both; }
- .panel.active .card:nth-of-type(4) { animation: fadeUp 0.45s var(--ease-out) 0.16s both; }
- .panel.active .card:nth-of-type(5) { animation: fadeUp 0.45s var(--ease-out) 0.2s both; }
- 
- @keyframes fadeUp {
-     from { opacity: 0; transform: translateY(8px); }
-     to   { opacity: 1; transform: translateY(0); }
- }
- 
- /* ── Cards ── */
- .card {
-     background: var(--bg);
-     border: 1px solid var(--border);
-     border-radius: var(--r-md);
-     padding: 24px 26px;
-     margin-bottom: 20px;
-     box-shadow: var(--shadow-card);
-     transition: box-shadow var(--ease-out), border-color var(--ease), transform var(--ease-out);
- }
- 
- .card:hover {
-     border-color: var(--border-hi);
-     box-shadow: var(--shadow-card-hover);
-     transform: translateY(-2px);
- }
- 
- .card-title {
-     font-family: var(--body);
-     font-size: 11.5px;
-     font-weight: 700;
-     color: var(--text-mid);
-     text-transform: uppercase;
-     letter-spacing: 0.9px;
-     margin-bottom: 20px;
-     display: flex;
-     align-items: center;
-     gap: 10px;
- }
- 
- .card-title::before {
-     content: '';
-     width: 4px;
-     height: 4px;
-     background: var(--accent);
-     border-radius: 50%;
-     box-shadow: 0 0 0 3px var(--accent-soft);
-     flex-shrink: 0;
- }
- 
- .card-title::after {
-     content: '';
-     flex: 1;
-     height: 1px;
-     background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
- }
- 
- /* ── Form grid ── */
- .form-grid {
-     display: grid;
-     grid-template-columns: 1fr 1fr;
-     gap: 18px 28px;
- }
- 
- .form-grid.cols-1 {
-     grid-template-columns: 1fr;
- }
- 
- .field {
-     display: flex;
-     flex-direction: column;
-     gap: 7px;
- }
- 
- .field.span-2 {
-     grid-column: span 2;
- }
- 
- .field label {
-     font-family: var(--body);
-     font-size: 13px;
-     font-weight: 600;
-     color: var(--text);
-     letter-spacing: -0.15px;
- }
- 
- /* ── Inputs ── */
- input[type="text"],
- select,
- textarea {
-     font-family: var(--body);
-     font-size: 14px;
-     padding: 11px 14px;
-     background: var(--bg);
-     color: var(--text);
-     border: 1px solid var(--border);
-     border-radius: var(--r-sm);
-     outline: none;
-     transition: border-color var(--ease), box-shadow var(--ease), background var(--ease);
-     width: 100%;
-     letter-spacing: -0.1px;
-     line-height: 1.45;
-     box-shadow: var(--shadow-xs);
- }
- 
- input[type="text"]::placeholder,
- textarea::placeholder {
-     color: var(--text-faint);
-     font-weight: 400;
- }
- 
- input[type="text"]:hover:not(:focus),
- select:hover:not(:focus),
- textarea:hover:not(:focus) {
-     border-color: var(--border-hi);
-     background: var(--bg-subtle);
- }
- 
- input[type="text"]:focus,
- select:focus,
- textarea:focus {
-     border-color: var(--accent);
-     box-shadow: 0 0 0 4px var(--accent-ring);
-     background: var(--bg);
- }
- 
- input[readonly] {
-     background: var(--surface);
-     color: var(--text-mid);
-     cursor: default;
-     border-style: dashed;
-     border-color: var(--border-hi);
- }
- 
- input[readonly]:hover,
- input[readonly]:focus {
-     border-color: var(--border-hi);
-     box-shadow: none;
-     background: var(--surface);
- }
- 
- textarea {
-     resize: vertical;
-     min-height: 100px;
-     line-height: 1.6;
- }
- 
- select {
-     cursor: pointer;
-     appearance: none;
-     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%2364748b' stroke-width='1.75' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-     background-repeat: no-repeat;
-     background-position: right 13px center;
-     padding-right: 36px;
- }
- 
- select option {
-     background: var(--bg);
-     color: var(--text);
- }
- 
- /* ── Buttons ── */
- .btn {
-     font-family: var(--body);
-     font-size: 13.5px;
-     font-weight: 600;
-     padding: 9px 16px;
-     border: 1px solid var(--border);
-     border-radius: var(--r-sm);
-     background: var(--bg);
-     color: var(--text);
-     cursor: pointer;
-     transition: all var(--ease);
-     white-space: nowrap;
-     letter-spacing: -0.15px;
-     box-shadow: var(--shadow-sm);
-     display: inline-flex;
-     align-items: center;
-     gap: 6px;
-     min-height: 36px;
- }
- 
- .btn:hover {
-     background: var(--bg);
-     border-color: var(--border-hi);
-     box-shadow: var(--shadow-md);
-     transform: translateY(-1px);
- }
- 
- .btn:active {
-     transform: translateY(0);
-     box-shadow: var(--shadow-sm);
- }
- 
- .btn-accent {
-     background: linear-gradient(180deg, #4287f7 0%, #2e7cf6 100%);
-     color: white;
-     border-color: var(--accent-deep);
-     font-weight: 600;
-     box-shadow: var(--shadow-accent);
- }
- 
- .btn-accent:hover {
-     background: linear-gradient(180deg, #3a82f6 0%, #1f6ae8 100%);
-     border-color: var(--accent-deep);
-     box-shadow: var(--shadow-accent-hover);
-     transform: translateY(-1px);
- }
- 
- .btn-accent:active {
-     transform: translateY(0);
-     box-shadow: var(--shadow-accent);
- }
- 
- .btn-danger {
-     color: var(--danger);
-     border-color: rgba(225, 29, 72, 0.2);
-     background: var(--bg);
- }
- 
- .btn-danger:hover {
-     background: var(--danger-soft);
-     border-color: rgba(225, 29, 72, 0.4);
-     color: var(--danger);
- }
- 
- .btn-outline-accent {
-     color: var(--accent-deep);
-     border-color: rgba(46, 124, 246, 0.3);
-     background: var(--bg);
- }
- 
- .btn-outline-accent:hover {
-     background: var(--accent-soft);
-     border-color: var(--accent);
-     color: var(--accent-deep);
- }
- 
- .btn-row {
-     display: flex;
-     gap: 8px;
-     flex-wrap: wrap;
-     align-items: center;
- }
- 
- /* ── Format toggle (iOS-style segmented control) ── */
- .fmt-toggle {
-     display: inline-flex;
-     background: var(--surface-up);
-     border: 1px solid var(--border);
-     border-radius: var(--r-sm);
-     padding: 3px;
-     gap: 0;
-     box-shadow: var(--shadow-inset);
- }
- 
- .fmt-opt {
-     padding: 5px 14px;
-     color: var(--text-mid);
-     cursor: pointer;
-     transition: color var(--ease), background var(--ease), box-shadow var(--ease);
-     user-select: none;
-     font-family: var(--body);
-     font-size: 12px;
-     font-weight: 600;
-     border-radius: 5px;
-     letter-spacing: -0.1px;
-     min-height: 26px;
-     display: inline-flex;
-     align-items: center;
- }
- 
- .fmt-opt:hover {
-     color: var(--text);
- }
- 
- .fmt-opt.active {
-     background: var(--bg);
-     color: var(--text-strong);
-     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
- }
- 
- /* ── Output ── */
- .output-box {
-     font-family: var(--mono);
-     font-size: 12.5px;
-     background: var(--bg-subtle);
-     color: var(--text);
-     border: 1px solid var(--border);
-     border-radius: var(--r-sm);
-     padding: 16px 18px;
-     min-height: 150px;
-     max-height: 340px;
-     overflow-y: auto;
-     white-space: pre-wrap;
-     word-break: break-word;
-     line-height: 1.7;
-     box-shadow: var(--shadow-inset);
-     letter-spacing: -0.1px;
- }
- 
- /* ── Action toggles ── */
- .action-toggles {
-     display: flex;
-     gap: 8px;
-     flex-wrap: wrap;
- }
- 
- .action-toggle {
-     padding: 9px 16px;
-     font-family: var(--body);
-     font-size: 13.5px;
-     font-weight: 600;
-     border: 1px solid var(--border);
-     border-radius: var(--r-sm);
-     background: var(--bg);
-     color: var(--text-muted);
-     cursor: pointer;
-     transition: all var(--ease);
-     user-select: none;
-     box-shadow: var(--shadow-sm);
-     letter-spacing: -0.15px;
-     min-height: 36px;
-     display: inline-flex;
-     align-items: center;
- }
- 
- .action-toggle:hover {
-     border-color: var(--border-hi);
-     color: var(--text);
-     box-shadow: var(--shadow-md);
-     transform: translateY(-1px);
- }
- 
- .action-toggle.active {
-     background: var(--accent-soft);
-     color: var(--accent-deep);
-     border-color: var(--accent);
-     box-shadow: 0 0 0 1px var(--accent), 0 2px 6px var(--accent-ring);
- }
- 
- .action-toggle.active::before {
-     content: '✓';
-     font-size: 11px;
-     font-weight: 800;
-     margin-right: 2px;
- }
- 
- /* ── Checkbox ── */
- .check-row {
-     display: inline-flex;
-     align-items: center;
-     gap: 9px;
-     font-family: var(--body);
-     font-size: 13px;
-     color: var(--text-muted);
-     cursor: pointer;
-     font-weight: 500;
-     padding: 6px 10px;
-     border-radius: var(--r-sm);
-     transition: background var(--ease);
-     letter-spacing: -0.1px;
- }
- 
- .check-row:hover {
-     background: var(--surface);
-     color: var(--text);
- }
- 
- .check-row input[type="checkbox"] {
-     width: 16px;
-     height: 16px;
-     accent-color: var(--accent);
-     cursor: pointer;
- }
- 
- /* ── Status bar ── */
- .status-bar {
-     position: fixed;
-     bottom: 0;
-     left: 256px;
-     right: 0;
-     padding: 10px 56px;
-     font-family: var(--body);
-     font-size: 12.5px;
-     color: var(--text-mid);
-     background: rgba(243, 245, 249, 0.85);
-     backdrop-filter: saturate(180%) blur(20px);
-     -webkit-backdrop-filter: saturate(180%) blur(20px);
-     border-top: 1px solid var(--border);
-     z-index: 100;
-     display: flex;
-     justify-content: space-between;
-     align-items: center;
-     font-weight: 500;
-     letter-spacing: -0.1px;
- }
- 
- .status-bar .shortcuts {
-     font-family: var(--mono);
-     font-size: 11.5px;
-     color: var(--text-mid);
-     letter-spacing: -0.15px;
- }
- 
- /* ── Token chips ── */
- .editor-tokens {
-     display: flex;
-     flex-wrap: wrap;
-     gap: 6px;
-     margin-bottom: 4px;
- }
- 
- .token-chip {
-     font-family: var(--mono);
-     font-size: 11.5px;
-     font-weight: 600;
-     padding: 4px 10px;
-     background: var(--bg);
-     color: var(--text-muted);
-     border: 1px solid var(--border);
-     border-radius: 6px;
-     cursor: pointer;
-     transition: all var(--ease);
-     letter-spacing: -0.1px;
-     box-shadow: var(--shadow-xs);
- }
- 
- .token-chip:hover {
-     background: var(--accent-soft);
-     color: var(--accent-deep);
-     border-color: var(--accent);
-     transform: translateY(-1px);
-     box-shadow: var(--shadow-sm);
- }
- 
- .token-chip:active {
-     transform: translateY(0);
- }
- 
- #templateEditor {
-     font-family: var(--mono);
-     font-size: 13px;
-     min-height: 240px;
-     white-space: pre;
-     tab-size: 4;
-     line-height: 1.65;
-     letter-spacing: -0.1px;
- }
- 
- .template-meta {
-     font-family: var(--mono);
-     font-size: 12px;
-     color: var(--text-mid);
-     margin-top: 10px;
-     font-weight: 500;
-     padding: 8px 12px;
-     background: var(--surface);
-     border-radius: var(--r-xs);
-     letter-spacing: -0.1px;
-     border: 1px solid var(--border);
- }
- 
- /* ── Loading state ── */
- .loading .main {
-     opacity: 0.4;
-     pointer-events: none;
- }
- 
- /* ── Responsive polish ── */
- @media (max-width: 900px) {
-     .app { grid-template-columns: 1fr; }
-     .sidebar { display: none; }
-     .status-bar { left: 0; padding: 10px 24px; }
-     .main { padding: 28px 24px 80px; }
-     .form-grid { grid-template-columns: 1fr; }
- }
- </style>
- </head>
- <body class="loading">
- <div class="app">
-     <!-- ═══ SIDEBAR ═══ -->
-     <aside class="sidebar">
-         <div class="sidebar-brand">
-             <div class="logo">Ticket<br>Generator</div>
-             <div class="version">v2.0 — server edition</div>
-         </div>
-         <nav class="nav-group">
-             <div class="nav-label">Workspace</div>
-             <div class="nav-item active" data-tab="ticket"><span class="nav-icon">T</span> Ticket Form</div>
-             <div class="nav-item" data-tab="request"><span class="nav-icon">Q</span> Quick Request</div>
-             <div class="nav-item" data-tab="editor"><span class="nav-icon">E</span> Template Editor</div>
-         </nav>
-         <div class="sidebar-footer">
-             <div class="conn-dot" id="connStatus">Disconnected</div>
-         </div>
-     </aside>
-     <!-- ═══ MAIN ═══ -->
-     <main class="main">
-         <!-- ── TICKET FORM (built dynamically) ── -->
-         <div id="tab-ticket" class="panel active">
-             <div class="page-header">
-                 <h2>Ticket Form</h2>
-                 <div class="desc">Fill in the fields, generate, and copy. AD Lookup auto-populates from Active Directory.</div>
-             </div>
-             <div class="card">
-                 <div class="card-title">Preset</div>
-                 <div class="form-grid">
-                     <div class="field">
-                         <label>Template</label>
-                         <select id="cmbTemplate"></select>
-                         <div id="templateMeta" class="template-meta">Select a template to auto-fill category metadata.</div>
-                     </div>
-                     <div class="field">
-                         <label>Ticket Type</label>
-                         <select id="cmbTicketType"></select>
-                     </div>
-                 </div>
-             </div>
-             <div class="card">
-                 <div class="card-title">Identity</div>
-                 <div class="form-grid" id="ticketFieldsGrid"></div>
-                 <div style="margin-top:14px">
-                     <button class="btn btn-outline-accent" id="btnLookup">AD Lookup</button>
-                 </div>
-             </div>
-             <div class="card">
-                 <div class="card-title">Dropdowns</div>
-                 <div class="form-grid" id="dropdownsGrid"></div>
-             </div>
-             <div class="card">
-                 <div class="card-title">Description</div>
-                 <div class="form-grid cols-1">
-                     <div class="field">
-                         <label>Situation</label>
-                         <textarea id="txtSituation" rows="4" placeholder="What happened?"></textarea>
-                     </div>
-                     <div class="field">
-                         <label>Process</label>
-                         <textarea id="txtProcess" rows="4" placeholder="What did you do?"></textarea>
-                     </div>
-                 </div>
-             </div>
-             <div class="card">
-                 <div class="card-title">Output</div>
-                 <div class="btn-row" style="margin-bottom:14px">
-                     <div class="fmt-toggle">
-                         <div class="fmt-opt active" data-fmt="json">JSON</div>
-                         <div class="fmt-opt" data-fmt="plain">Plain</div>
-                     </div>
-                     <button class="btn btn-accent" id="btnGenerate">Generate + Copy</button>
-                     <button class="btn" id="btnCopyOutput">Copy Output</button>
-                     <button class="btn" id="btnCopyJson">Copy JSON</button>
-                     <button class="btn btn-danger" id="btnClear">Clear All</button>
-                 </div>
-                 <label class="check-row" style="margin-bottom:12px">
-                     <input type="checkbox" id="chkAutoSave" checked>
-                     Auto-save current_user.json on generate
-                 </label>
-                 <div class="output-box" id="outputBox"></div>
-             </div>
-         </div>
-         <!-- ── QUICK REQUEST (built dynamically) ── -->
-         <div id="tab-request" class="panel">
-             <div class="page-header">
-                 <h2>Quick Request</h2>
-                 <div class="desc">Fast-track common actions. Identity syncs from the ticket form.</div>
-             </div>
-             <div class="card">
-                 <div class="card-title">Identity</div>
-                 <div class="form-grid" id="requestFieldsGrid"></div>
-             </div>
-             <div class="card">
-                 <div class="card-title">Actions</div>
-                 <div class="action-toggles" id="actionToggles" style="margin-bottom:16px"></div>
-                 <div class="btn-row">
-                     <button class="btn btn-accent" id="btnReqGenerate">Generate + Copy</button>
-                     <button class="btn" id="btnReqCopy">Copy Output</button>
-                     <button class="btn btn-danger" id="btnReqClear">Clear All</button>
-                 </div>
-             </div>
-             <div class="card">
-                 <div class="card-title">Generated Request</div>
-                 <div class="output-box" id="reqOutputBox"></div>
-             </div>
-         </div>
-         <!-- ── TEMPLATE EDITOR ── -->
-         <div id="tab-editor" class="panel">
-             <div class="page-header">
-                 <h2>Template Editor</h2>
-                 <div class="desc">Customize the plain-text output block. Click a token to insert it at cursor.</div>
-             </div>
-             <div class="card">
-                 <div class="card-title">Available Tokens</div>
-                 <div class="editor-tokens" id="tokenList"></div>
-             </div>
-             <div class="card">
-                 <div class="card-title">Template</div>
-                 <textarea id="templateEditor" rows="14"></textarea>
-                 <div class="btn-row" style="margin-top:14px">
-                     <button class="btn btn-accent" id="btnSaveTemplate">Save Template</button>
-                     <button class="btn btn-danger" id="btnResetTemplate">Reset to Default</button>
-                 </div>
-             </div>
-             <div class="card">
-                 <div class="card-title">Live Preview</div>
-                 <div class="output-box" id="previewBox" style="min-height:180px"></div>
-             </div>
-         </div>
-     </main>
- </div>
- <div class="status-bar">
-     <span id="statusText">Connecting...</span>
-     <span class="shortcuts">Enter = Generate &middot; Ctrl+Space = AD Lookup &middot; Shift+Del = Clear</span>
- </div>
- <script>
- // ====================================================================
- // STATE
- // ====================================================================
- const TOKEN = new URLSearchParams(location.search).get('token') || '';
- let CFG = {};          // everything from /api/config
- let outputFormat = 'json';
- let lastTicket = null;
- // ====================================================================
- // API
- // ====================================================================
- async function api(path, opts = {}) {
-     const sep = path.includes('?') ? '&' : '?';
-     return (await fetch(path + sep + 'token=' + TOKEN, {
-         headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN }, ...opts
-     })).json();
- }
- // ====================================================================
- // HELPERS
- // ====================================================================
- const $ = id => document.getElementById(id);
- const setStatus = (t, c) => { $('statusText').textContent = t; $('statusText').style.color = c || 'var(--text-dim)'; };
- const val = id => ($(id)?.value || '').trim();
- const sel = id => $(id)?.value || '';
- const setVal = (id, v) => { if ($(id)) $(id).value = v; };
- function normalizePhone(v) {
-     const d = v.replace(/\D/g, '');
-     return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : v.trim();
- }
- function expandTemplate(tpl, vals) {
-     let r = tpl;
-     for (const k in vals) r = r.replaceAll(`{{${k}}}`, vals[k] || '');
-     return r;
- }
- // ====================================================================
- // UI BUILDERS — construct form from config data
- // ====================================================================
- /** Build <input> or <select> fields into a grid container */
- function buildFields(containerId, fieldDefs) {
-     const grid = $(containerId);
-     grid.innerHTML = '';
-     for (const f of fieldDefs) {
-         const div = document.createElement('div');
-         div.className = 'field';
-         const lbl = document.createElement('label');
-         lbl.textContent = f.label;
-         lbl.setAttribute('for', f.id);
-         const input = document.createElement('input');
-         input.type = 'text';
-         input.id = f.id;
-         if (f.placeholder) input.placeholder = f.placeholder;
-         div.appendChild(lbl);
-         div.appendChild(input);
-         grid.appendChild(div);
-     }
- }
- /** Build dropdown selects from config.dropdowns into a grid */
- function buildDropdowns(containerId, dropdowns) {
-     const grid = $(containerId);
-     grid.innerHTML = '';
-     // Pretty labels for dropdown keys
-     const labels = {
-         status: 'Status', locationArea: 'Location Area',
-         closureCode: 'Closure Code'
-     };
-     for (const [key, options] of Object.entries(dropdowns)) {
-         // ticketType is handled separately in Preset card
-         if (key === 'ticketType') continue;
-         const div = document.createElement('div');
-         div.className = 'field';
-         const lbl = document.createElement('label');
-         lbl.textContent = labels[key] || key;
-         const select = document.createElement('select');
-         select.id = 'cmb_' + key;
-         // Add default option
-         const defOpt = document.createElement('option');
-         defOpt.textContent = '-- Select --';
-         select.appendChild(defOpt);
-         for (const opt of options) {
-             const o = document.createElement('option');
-             o.textContent = opt;
-             select.appendChild(o);
-         }
-         div.appendChild(lbl);
-         div.appendChild(select);
-         grid.appendChild(div);
-     }
- }
- /** Populate a single <select> element */
- function populateSelect(selectId, options) {
-     const el = $(selectId);
-     if (!el) return;
-     el.innerHTML = '';
-     for (const opt of options) {
-         const o = document.createElement('option');
-         o.textContent = opt;
-         el.appendChild(o);
-     }
- }
- /** Build action toggle buttons from config.quickActions */
- function buildActionToggles(containerId, actions) {
-     const container = $(containerId);
-     container.innerHTML = '';
-     for (const [key, label] of Object.entries(actions)) {
-         const btn = document.createElement('div');
-         btn.className = 'action-toggle';
-         btn.dataset.action = key;
-         btn.textContent = label;
-         btn.addEventListener('click', () => btn.classList.toggle('active'));
-         container.appendChild(btn);
-     }
- }
- /** Build template preset dropdown */
- function buildTemplateSelect() {
-     const cmb = $('cmbTemplate');
-     cmb.innerHTML = '<option>-- None --</option>';
-     for (const name in CFG.templateMap) {
-         const o = document.createElement('option');
-         o.textContent = name;
-         cmb.appendChild(o);
-     }
- }
- /** Build clickable token chips for the editor */
- function buildTokenChips() {
-     // Collect all known token names from field IDs + known extras
-     const tokens = new Set();
-     const fieldIdToToken = {
-         txtName: 'name', txtUser: 'user', txtDept: 'department',
-         txtLocation: 'location', txtContact: 'contact', txtEmail: 'email',
-         txtTopic: 'topic', txtTechnician: 'technician'
-     };
-     for (const t of Object.values(fieldIdToToken)) tokens.add(t);
-     // Always include these
-     ['topic_raw','situation','subject','process','ticketType',
-      'status','locationArea','closureCode','category','subcategory','item'].forEach(t => tokens.add(t));
-     const container = $('tokenList');
-     container.innerHTML = '';
-     for (const t of tokens) {
-         const chip = document.createElement('div');
-         chip.className = 'token-chip';
-         chip.textContent = '{{' + t + '}}';
-         chip.addEventListener('click', () => {
-             const ed = $('templateEditor');
-             const pos = ed.selectionStart;
-             const ins = '{{' + t + '}}';
-             ed.value = ed.value.slice(0, pos) + ins + ed.value.slice(pos);
-             ed.focus();
-             ed.selectionStart = ed.selectionEnd = pos + ins.length;
-             updatePreview();
-         });
-         container.appendChild(chip);
-     }
- }
- // ====================================================================
- // NAV
- // ====================================================================
- document.querySelectorAll('.nav-item').forEach(item => {
-     item.addEventListener('click', () => {
-         document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-         item.classList.add('active');
-         $('tab-' + item.dataset.tab).classList.add('active');
-         if (item.dataset.tab === 'request') syncIdentity();
-     });
- });
- // ====================================================================
- // TEMPLATE SELECTOR
- // ====================================================================
- $('cmbTemplate').addEventListener('change', function() {
-     const name = this.value;
-     const meta = CFG.templateMap?.[name] || { Category: '', Subcategory: '', Item: '' };
-     if (name && name !== '-- None --') setVal('txtTopic', name);
-     $('templateMeta').textContent =
-         `Category: ${meta.Category || '—'}  ·  Subcategory: ${meta.Subcategory || '—'}  ·  Item: ${meta.Item || '—'}`;
- });
- // ====================================================================
- // FORMAT TOGGLE
- // ====================================================================
- document.querySelectorAll('.fmt-opt').forEach(opt => {
-     opt.addEventListener('click', () => {
-         outputFormat = opt.dataset.fmt;
-         document.querySelectorAll('.fmt-opt').forEach(o => o.classList.toggle('active', o.dataset.fmt === outputFormat));
-         renderOutput();
-     });
- });
- // ====================================================================
- // SYNC IDENTITY → QUICK REQUEST
- // ====================================================================
- function syncIdentity() {
-     if (val('txtName')) setVal('txtReqName', val('txtName'));
-     if (val('txtUser')) setVal('txtReqUser', val('txtUser'));
- }
- // ====================================================================
- // AD LOOKUP — uses mapping from server config
- // ====================================================================
- async function adLookup() {
-     const user = val('txtUser'), name = val('txtName');
-     if (!user && !name) { setStatus('Enter a username or name first.', 'var(--danger)'); return; }
-     setStatus('Looking up Active Directory...', 'var(--accent)');
-     const params = new URLSearchParams();
-     if (user) params.set('user', user);
-     if (name) params.set('name', name);
-     const data = await api('/api/ad?' + params.toString());
-     if (!data.ok) { setStatus(data.error || 'AD lookup failed.', 'var(--danger)'); return; }
-     // Use the mapping from the server to put AD values into the right fields
-     const mapping = data._mapping || CFG.adMapping || {};
-     for (const [adProp, fieldId] of Object.entries(mapping)) {
-         const value = data[adProp];
-         if (value && $(fieldId)) {
-             // Only fill location if empty
-             if (fieldId === 'txtLocation' && val('txtLocation')) continue;
-             setVal(fieldId, value);
-         }
-     }
-     syncIdentity();
-     setStatus('AD lookup complete.', 'var(--success)');
- }
- $('btnLookup').addEventListener('click', adLookup);
- // ====================================================================
- // TICKET GENERATION
- // ====================================================================
- function getTicketValues() {
-     const templateName = sel('cmbTemplate');
-     const meta = CFG.templateMap?.[templateName] || { Category: '', Subcategory: '', Item: '' };
-     const name = val('txtName'), user = val('txtUser'), department = val('txtDept');
-     const location = val('txtLocation'), contact = normalizePhone(val('txtContact'));
-     const email = val('txtEmail'), topicRaw = val('txtTopic');
-     const situation = val('txtSituation'), process = val('txtProcess');
-     const technician = val('txtTechnician'), ticketType = sel('cmbTicketType') || 'Incident';
-     // Read dynamic dropdowns
-     const status       = sel('cmb_status');
-     const locationArea = sel('cmb_locationArea');
-     const closureCode  = sel('cmb_closureCode');
-     const prefix = ticketType === 'Request' ? 'Req' : 'Error';
-     let subject;
-     if (topicRaw && situation)  subject = `${prefix} [${topicRaw}] - ${situation}`;
-     else if (topicRaw)          subject = `${prefix} [${topicRaw}]`;
-     else                        subject = situation;
-     const values = {
-         name, user, department, location, contact, email,
-         topic: topicRaw, topic_raw: topicRaw, situation, subject,
-         process, technician, ticketType, status, locationArea, closureCode,
-         category: meta.Category, subcategory: meta.Subcategory, item: meta.Item
-     };
-     values.full_block = expandTemplate(CFG.blockTemplate, values);
-     const obj = {
-         name, user, department, location, contact, email,
-         topic: subject, topic_raw: topicRaw, subject,
-         situation, process, ticket_type: ticketType,
-         full_block: values.full_block
-     };
-     if (email)      obj._email = email;
-     if (technician) obj._technician = technician;
-     if (status && status !== '-- Select --')           obj._status = status;
-     if (locationArea && locationArea !== '-- Select --') obj._locationArea = locationArea;
-     if (closureCode && closureCode !== '-- Select --')   obj._closureCode = closureCode;
-     if (meta.Category)    obj._category = meta.Category;
-     if (meta.Subcategory) obj._subcategory = meta.Subcategory;
-     if (meta.Item)        obj._item = meta.Item;
-     return { obj, values };
- }
- function renderOutput() {
-     const box = $('outputBox');
-     if (!lastTicket) { box.textContent = ''; return; }
-     box.textContent = outputFormat === 'plain'
-         ? lastTicket.values.full_block
-         : JSON.stringify(lastTicket.obj, null, 2);
- }
- async function generateTicket(copy = true) {
-     lastTicket = getTicketValues();
-     renderOutput();
-     if ($('chkAutoSave').checked) {
-         await api('/api/save', { method: 'POST', body: JSON.stringify(lastTicket.obj) });
-     }
-     if (copy) {
-         const text = $('outputBox').textContent;
-         const res = await api('/api/clipboard', { method: 'POST', body: JSON.stringify({ text }) });
-         setStatus(res.ok ? 'Generated and copied to clipboard.' : 'Generated, but clipboard copy failed.',
-                   res.ok ? 'var(--success)' : 'var(--danger)');
-     } else {
-         setStatus('Ticket generated.', 'var(--success)');
-     }
- }
- async function copyOutput() {
-     if (!lastTicket) await generateTicket(false);
-     const res = await api('/api/clipboard', { method: 'POST', body: JSON.stringify({ text: $('outputBox').textContent }) });
-     setStatus(res.ok ? 'Output copied.' : 'Failed.', res.ok ? 'var(--success)' : 'var(--danger)');
- }
- async function copyJson() {
-     if (!lastTicket) lastTicket = getTicketValues();
-     const res = await api('/api/clipboard', { method: 'POST', body: JSON.stringify({ text: JSON.stringify(lastTicket.obj, null, 2) }) });
-     setStatus(res.ok ? 'JSON copied for browser extension.' : 'Failed.', res.ok ? 'var(--success)' : 'var(--danger)');
- }
- function clearTicketForm() {
-     // Clear all text inputs that were built from config
-     if (CFG.fields?.ticket) {
-         for (const f of CFG.fields.ticket) {
-             if (f.id === 'txtTechnician' && CFG.technician) continue; // locked
-             setVal(f.id, '');
-         }
-     }
-     setVal('txtSituation', '');
-     setVal('txtProcess', '');
-     // Reset dropdowns
-     $('cmbTemplate').selectedIndex = 0;
-     $('cmbTicketType').selectedIndex = 0;
-     document.querySelectorAll('#dropdownsGrid select').forEach(s => s.selectedIndex = 0);
-     $('templateMeta').textContent = 'Select a template to auto-fill category metadata.';
-     $('outputBox').textContent = '';
-     lastTicket = null;
-     outputFormat = 'json';
-     document.querySelectorAll('.fmt-opt').forEach(o => o.classList.toggle('active', o.dataset.fmt === 'json'));
-     $('txtName')?.focus();
-     setStatus('Form cleared.');
- }
- $('btnGenerate').addEventListener('click', () => generateTicket(true));
- $('btnCopyOutput').addEventListener('click', copyOutput);
- $('btnCopyJson').addEventListener('click', copyJson);
- $('btnClear').addEventListener('click', clearTicketForm);
- // ====================================================================
- // QUICK REQUEST
- // ====================================================================
- async function generateQuickRequest() {
-     syncIdentity();
-     const name = val('txtReqName'), user = val('txtReqUser'), okta = val('txtReqOkta');
-     const actions = [];
-     document.querySelectorAll('.action-toggle.active').forEach(b => {
-         const label = CFG.quickActions?.[b.dataset.action] || b.textContent;
-         actions.push(label);
-     });
-     const header = actions.length ? actions.join(' / ') : '(No action selected)';
-     const text = `${header}\n---\nName: ${name}\nUser: ${user}\nOkta: ${okta}`.trim();
-     $('reqOutputBox').textContent = text;
-     const res = await api('/api/clipboard', { method: 'POST', body: JSON.stringify({ text }) });
-     setStatus(res.ok ? 'Quick request copied.' : 'Generated, clipboard failed.',
-               res.ok ? 'var(--success)' : 'var(--danger)');
- }
- function clearQuickRequest() {
-     if (CFG.fields?.request) {
-         for (const f of CFG.fields.request) setVal(f.id, '');
-     }
-     $('reqOutputBox').textContent = '';
-     document.querySelectorAll('.action-toggle').forEach(b => b.classList.remove('active'));
-     $('txtReqName')?.focus();
-     setStatus('Quick request cleared.');
- }
- $('btnReqGenerate').addEventListener('click', generateQuickRequest);
- $('btnReqCopy').addEventListener('click', async () => {
-     const text = $('reqOutputBox').textContent;
-     if (!text) { generateQuickRequest(); return; }
-     const res = await api('/api/clipboard', { method: 'POST', body: JSON.stringify({ text }) });
-     setStatus(res.ok ? 'Copied.' : 'Failed.', res.ok ? 'var(--success)' : 'var(--danger)');
- });
- $('btnReqClear').addEventListener('click', clearQuickRequest);
- // ====================================================================
- // TEMPLATE EDITOR
- // ====================================================================
- const SAMPLE = {
-     name: 'Juan Perez', user: 'jperez', department: 'Finance',
-     location: 'Santa Cruz', contact: '(555) 555-1234',
-     email: 'juan.perez@company.com', topic: 'Password Reset',
-     topic_raw: 'Password Reset',
-     situation: 'User cannot sign in after password expiry.',
-     subject: 'Error [Password Reset] - User cannot sign in after password expiry.',
-     process: 'Verified identity, reset password, confirmed successful login.',
-     technician: 'Armando', ticketType: 'Incident',
-     status: 'Open', locationArea: 'Remoto', closureCode: 'Success',
-     category: 'Applications', subcategory: 'Password Reset', item: ''
- };
- function updatePreview() {
-     $('previewBox').textContent = expandTemplate($('templateEditor').value || CFG.blockTemplate, SAMPLE);
- }
- $('templateEditor').addEventListener('input', updatePreview);
- $('btnSaveTemplate').addEventListener('click', () => {
-     CFG.blockTemplate = $('templateEditor').value;
-     updatePreview();
-     setStatus('Template saved for this session.', 'var(--success)');
- });
- $('btnResetTemplate').addEventListener('click', () => {
-     $('templateEditor').value = CFG.blockTemplate;
-     updatePreview();
-     setStatus('Template reset.', 'var(--success)');
- });
- // ====================================================================
- // KEYBOARD SHORTCUTS
- // ====================================================================
- document.addEventListener('keydown', e => {
-     const tab = document.querySelector('.nav-item.active')?.dataset.tab;
-     if (e.ctrlKey && e.code === 'Space' && tab === 'ticket') { e.preventDefault(); adLookup(); return; }
-     if (e.shiftKey && e.key === 'Delete') {
-         e.preventDefault();
-         if (tab === 'ticket') clearTicketForm(); else if (tab === 'request') clearQuickRequest();
-         return;
-     }
-     if (e.key === 'Enter' && tab !== 'editor') {
-         const tag = document.activeElement?.tagName;
-         if (tag === 'TEXTAREA' && e.shiftKey) return;
-         if (tag === 'TEXTAREA') e.preventDefault();
-         if (tag === 'SELECT') return;
-         e.preventDefault();
-         if (tab === 'ticket') generateTicket(true); else if (tab === 'request') generateQuickRequest();
-     }
- });
- // ====================================================================
- // INIT — fetch config, build entire UI from it
- // ====================================================================
- async function init() {
-     try {
-         const data = await api('/api/config');
-         if (!data.ok) { setStatus('Config load failed.', 'var(--danger)'); return; }
-         CFG = data;
-         // Build ticket form fields from config
-         if (CFG.fields?.ticket) buildFields('ticketFieldsGrid', CFG.fields.ticket);
-         // Build dropdown selects from config
-         if (CFG.dropdowns) {
-             buildDropdowns('dropdownsGrid', CFG.dropdowns);
-             if (CFG.dropdowns.ticketType) populateSelect('cmbTicketType', CFG.dropdowns.ticketType);
-         }
-         // Build quick request fields
-         if (CFG.fields?.request) buildFields('requestFieldsGrid', CFG.fields.request);
-         // Build action toggles
-         if (CFG.quickActions) buildActionToggles('actionToggles', CFG.quickActions);
-         // Lock technician if set in config
-         if (CFG.technician) {
-             const f = $('txtTechnician');
-             if (f) { f.value = CFG.technician; f.readOnly = true; }
-         }
-         // Template stuff
-         buildTemplateSelect();
-         buildTokenChips();
-         $('templateEditor').value = CFG.blockTemplate || '';
-         updatePreview();
-         // Wire up identity sync after fields are built
-         $('txtName')?.addEventListener('input', syncIdentity);
-         $('txtUser')?.addEventListener('input', syncIdentity);
-         // Connected!
-         $('connStatus').textContent = 'Connected';
-         $('connStatus').classList.add('ok');
-         document.body.classList.remove('loading');
-         setStatus('Ready.', 'var(--success)');
-         $('txtName')?.focus();
-     } catch {
-         setStatus('Cannot reach server. Is server.ps1 running?', 'var(--danger)');
-     }
- }
- init();
- </script>
- </body>
- </html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ticket Generator — Markdown Shell</title>
+<style>
+:root {
+    /* Surfaces */
+    --bg: #ffffff;
+    --page: #f3f5f9;
+    --sidebar: #fafbfd;
+    --bg-subtle: #f7f9fc;
+    --surface: #eef1f6;
+    --surface-up: #e4e8ef;
+    --surface-hi: #d6dce6;
+
+    /* Borders */
+    --border: #e2e6ec;
+    --border-hi: #cbd2dc;
+    --border-strong: #a8b1bf;
+
+    /* Accent */
+    --accent: #2e7cf6;
+    --accent-hover: #1f6ae8;
+    --accent-deep: #1a5fd0;
+    --accent-soft: rgba(46, 124, 246, 0.10);
+    --accent-glow: rgba(46, 124, 246, 0.06);
+    --accent-ring: rgba(46, 124, 246, 0.22);
+    --accent-gradient: linear-gradient(135deg, #4a90ff 0%, #2e7cf6 50%, #5b5bd6 100%);
+
+    /* Text */
+    --text: #0a0f1c;
+    --text-strong: #04070d;
+    --text-muted: #334155;
+    --text-mid: #475569;
+    --text-dim: #64748b;
+    --text-faint: #94a3b8;
+
+    /* Semantic */
+    --success: #15803d;
+    --success-soft: rgba(21, 128, 61, 0.12);
+    --warning: #d97706;
+    --danger: #dc2626;
+    --danger-soft: rgba(220, 38, 38, 0.09);
+
+    /* Shadows */
+    --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-sm:
+        0 1px 2px rgba(15, 23, 42, 0.05),
+        0 2px 4px rgba(15, 23, 42, 0.04);
+    --shadow-md:
+        0 1px 2px rgba(15, 23, 42, 0.06),
+        0 4px 8px -2px rgba(15, 23, 42, 0.08),
+        0 8px 16px -4px rgba(15, 23, 42, 0.06);
+    --shadow-lg:
+        0 1px 2px rgba(15, 23, 42, 0.06),
+        0 8px 16px -4px rgba(15, 23, 42, 0.1),
+        0 20px 32px -8px rgba(15, 23, 42, 0.12);
+    --shadow-card:
+        0 1px 2px rgba(15, 23, 42, 0.04),
+        0 2px 4px rgba(15, 23, 42, 0.04),
+        0 6px 12px -2px rgba(15, 23, 42, 0.06);
+    --shadow-card-hover:
+        0 2px 4px rgba(15, 23, 42, 0.05),
+        0 8px 16px -4px rgba(15, 23, 42, 0.1),
+        0 16px 32px -8px rgba(15, 23, 42, 0.1);
+    --shadow-accent:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 1px 2px rgba(46, 124, 246, 0.4),
+        0 4px 10px -2px rgba(46, 124, 246, 0.4),
+        0 8px 20px -4px rgba(46, 124, 246, 0.25);
+    --shadow-accent-hover:
+        inset 0 1px 0 rgba(255, 255, 255, 0.18),
+        0 1px 2px rgba(46, 124, 246, 0.45),
+        0 6px 14px -2px rgba(46, 124, 246, 0.5),
+        0 12px 28px -6px rgba(46, 124, 246, 0.35);
+    --shadow-inset:
+        inset 0 1px 2px rgba(15, 23, 42, 0.06),
+        inset 0 0 0 1px rgba(15, 23, 42, 0.01);
+
+    /* Radii */
+    --r-xs: 5px;
+    --r-sm: 7px;
+    --r: 10px;
+    --r-md: 12px;
+    --r-lg: 16px;
+
+    /* Typography */
+    --mono: 'SF Mono', 'JetBrains Mono', 'Monaco', 'Consolas', monospace;
+    --body: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Helvetica Neue', sans-serif;
+
+    /* Motion */
+    --ease: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-out: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: 0.4s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+*,*::before,*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+    font-family: var(--body);
+    font-size: 14px;
+    background: var(--page);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+::selection { background: var(--accent-soft); color: var(--accent-deep); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d4d8de; border-radius: 10px; border: 3px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: #b8bdc4; }
+
+/* Layout */
+.app { display: grid; grid-template-columns: 256px 1fr; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+}
+
+.sidebar-brand {
+    padding: 4px 20px 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.sidebar-brand::before {
+    content: '';
+    display: block;
+    width: 34px;
+    height: 34px;
+    background: var(--accent-gradient);
+    border-radius: 9px;
+    margin-bottom: 14px;
+    box-shadow:
+        0 1px 2px rgba(46, 124, 246, 0.3),
+        0 6px 16px -4px rgba(91, 91, 214, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+    position: relative;
+}
+
+.sidebar-brand::after {
+    content: '';
+    position: absolute;
+    top: 13px;
+    left: 28px;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.95);
+    border-radius: 3px;
+    box-sizing: border-box;
+}
+
+.sidebar-brand .logo {
+    font-family: var(--body);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-strong);
+    letter-spacing: -0.32px;
+    line-height: 1.25;
+}
+
+.sidebar-brand .version {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    font-weight: 500;
+    letter-spacing: -0.1px;
+}
+
+.nav-group { padding: 0 12px; }
+
+.nav-label {
+    font-family: var(--body);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 8px 12px 10px;
+    margin-bottom: 2px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 8px 10px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: background var(--ease), color var(--ease);
+    position: relative;
+    border: none;
+    margin-bottom: 2px;
+    letter-spacing: -0.1px;
+}
+
+.nav-item:hover { background: var(--surface-up); color: var(--text); }
+
+.nav-item:hover .nav-icon {
+    border-color: var(--border-hi);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+}
+
+.nav-item.active {
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    font-weight: 600;
+}
+
+.nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 18px;
+    background: var(--accent);
+    border-radius: 0 3px 3px 0;
+}
+
+.nav-item.active .nav-icon {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    box-shadow: 0 1px 2px var(--accent-ring), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.nav-icon {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    background: var(--bg);
+    color: var(--text-mid);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: var(--shadow-xs);
+    transition: all var(--ease);
+    letter-spacing: -0.3px;
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+}
+
+.conn-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-family: var(--body);
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: -0.1px;
+}
+
+.conn-dot::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--warning);
+    transition: all var(--ease);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+.conn-dot.ok::before {
+    background: var(--success);
+    box-shadow: 0 0 0 3px var(--success-soft);
+    animation: pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 3px var(--success-soft); }
+    50%      { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0.06); }
+}
+
+/* Main */
+.main {
+    padding: 44px 56px 90px;
+    overflow-y: auto;
+    max-height: 100vh;
+    position: relative;
+    background:
+        radial-gradient(circle at 0% 0%, rgba(46, 124, 246, 0.04) 0%, transparent 35%),
+        radial-gradient(circle at 100% 0%, rgba(91, 91, 214, 0.03) 0%, transparent 40%),
+        var(--page);
+}
+
+.page-header { margin-bottom: 32px; position: relative; }
+
+.page-header h2 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text-strong);
+    letter-spacing: -0.8px;
+    line-height: 1.2;
+}
+
+.page-header .desc {
+    font-size: 15px;
+    color: var(--text-mid);
+    font-weight: 400;
+    letter-spacing: -0.15px;
+    max-width: 640px;
+    line-height: 1.55;
+}
+
+/* Panels */
+.panel { display: none; }
+.panel.active { display: block; }
+
+.panel.active .page-header { animation: fadeUp 0.45s var(--ease-out) both; }
+.panel.active .card:nth-of-type(1) { animation: fadeUp 0.45s var(--ease-out) 0.04s both; }
+.panel.active .card:nth-of-type(2) { animation: fadeUp 0.45s var(--ease-out) 0.08s both; }
+.panel.active .card:nth-of-type(3) { animation: fadeUp 0.45s var(--ease-out) 0.12s both; }
+.panel.active .card:nth-of-type(4) { animation: fadeUp 0.45s var(--ease-out) 0.16s both; }
+.panel.active .card:nth-of-type(5) { animation: fadeUp 0.45s var(--ease-out) 0.2s both; }
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Cards */
+.card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 24px 26px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow var(--ease-out), border-color var(--ease), transform var(--ease-out);
+}
+
+.card:hover {
+    border-color: var(--border-hi);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
+}
+
+.card-title {
+    font-family: var(--body);
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-mid);
+    text-transform: uppercase;
+    letter-spacing: 0.9px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.card-title::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    flex-shrink: 0;
+}
+
+.card-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+}
+
+/* Form grid */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 28px;
+}
+
+.form-grid.cols-1 { grid-template-columns: 1fr; }
+
+.field { display: flex; flex-direction: column; gap: 7px; }
+
+.field label {
+    font-family: var(--body);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.15px;
+}
+
+/* Inputs */
+input[type="text"],
+input[type="date"],
+input[type="file"],
+select,
+textarea {
+    font-family: var(--body);
+    font-size: 14px;
+    padding: 11px 14px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    outline: none;
+    transition: border-color var(--ease), box-shadow var(--ease), background var(--ease);
+    width: 100%;
+    letter-spacing: -0.1px;
+    line-height: 1.45;
+    box-shadow: var(--shadow-xs);
+}
+
+input[type="text"]::placeholder,
+textarea::placeholder { color: var(--text-faint); font-weight: 400; }
+
+input[type="text"]:hover:not(:focus),
+input[type="date"]:hover:not(:focus),
+input[type="file"]:hover:not(:focus),
+select:hover:not(:focus),
+textarea:hover:not(:focus) {
+    border-color: var(--border-hi);
+    background: var(--bg-subtle);
+}
+
+input[type="text"]:focus,
+input[type="date"]:focus,
+input[type="file"]:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-ring);
+    background: var(--bg);
+}
+
+input[readonly] {
+    background: var(--surface);
+    color: var(--text-mid);
+    cursor: default;
+    border-style: dashed;
+    border-color: var(--border-hi);
+}
+
+input[readonly]:hover,
+input[readonly]:focus {
+    border-color: var(--border-hi);
+    box-shadow: none;
+    background: var(--surface);
+}
+
+textarea { resize: vertical; min-height: 100px; line-height: 1.6; }
+
+select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%2364748b' stroke-width='1.75' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 13px center;
+    padding-right: 36px;
+}
+
+select option { background: var(--bg); color: var(--text); }
+
+/* Buttons */
+.btn {
+    font-family: var(--body);
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    transition: all var(--ease);
+    white-space: nowrap;
+    letter-spacing: -0.15px;
+    box-shadow: var(--shadow-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+}
+
+.btn:hover {
+    background: var(--bg);
+    border-color: var(--border-hi);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.btn:active { transform: translateY(0); box-shadow: var(--shadow-sm); }
+
+.btn-accent {
+    background: linear-gradient(180deg, #4287f7 0%, #2e7cf6 100%);
+    color: white;
+    border-color: var(--accent-deep);
+    font-weight: 600;
+    box-shadow: var(--shadow-accent);
+}
+
+.btn-accent:hover {
+    background: linear-gradient(180deg, #3a82f6 0%, #1f6ae8 100%);
+    border-color: var(--accent-deep);
+    box-shadow: var(--shadow-accent-hover);
+    transform: translateY(-1px);
+}
+
+.btn-accent:active { transform: translateY(0); box-shadow: var(--shadow-accent); }
+
+.btn-danger {
+    color: var(--danger);
+    border-color: rgba(225, 29, 72, 0.2);
+    background: var(--bg);
+}
+
+.btn-danger:hover {
+    background: var(--danger-soft);
+    border-color: rgba(225, 29, 72, 0.4);
+    color: var(--danger);
+}
+
+.btn-outline-accent {
+    color: var(--accent-deep);
+    border-color: rgba(46, 124, 246, 0.3);
+    background: var(--bg);
+}
+
+.btn-outline-accent:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-deep);
+}
+
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* Compact report option */
+.report-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+}
+
+.report-option input {
+    width: 17px;
+    height: 17px;
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+/* Format toggle */
+.fmt-toggle {
+    display: inline-flex;
+    background: var(--surface-up);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 3px;
+    gap: 0;
+    box-shadow: var(--shadow-inset);
+}
+
+.fmt-opt {
+    padding: 5px 14px;
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: color var(--ease), background var(--ease), box-shadow var(--ease);
+    user-select: none;
+    font-family: var(--body);
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 5px;
+    letter-spacing: -0.1px;
+    min-height: 26px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.fmt-opt:hover { color: var(--text); }
+
+.fmt-opt.active {
+    background: var(--bg);
+    color: var(--text-strong);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+/* Output */
+.output-box {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--bg-subtle);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 16px 18px;
+    min-height: 150px;
+    max-height: 340px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.7;
+    box-shadow: var(--shadow-inset);
+    letter-spacing: -0.1px;
+}
+
+/* Action toggles */
+.action-toggles { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.action-toggle {
+    padding: 9px 16px;
+    font-family: var(--body);
+    font-size: 13.5px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--ease);
+    user-select: none;
+    box-shadow: var(--shadow-sm);
+    letter-spacing: -0.15px;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.action-toggle:hover {
+    border-color: var(--border-hi);
+    color: var(--text);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.action-toggle.active {
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 2px 6px var(--accent-ring);
+}
+
+.action-toggle.active::before {
+    content: '\2713';
+    font-size: 11px;
+    font-weight: 800;
+    margin-right: 2px;
+}
+
+/* Status bar */
+.status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 256px;
+    right: 0;
+    padding: 10px 56px;
+    font-family: var(--body);
+    font-size: 12.5px;
+    color: var(--text-mid);
+    background: rgba(243, 245, 249, 0.85);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 500;
+    letter-spacing: -0.1px;
+}
+
+.status-bar .shortcuts {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-mid);
+    letter-spacing: -0.15px;
+}
+
+/* Token chips */
+.editor-tokens { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+
+.token-chip {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 4px 10px;
+    background: var(--bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all var(--ease);
+    letter-spacing: -0.1px;
+    box-shadow: var(--shadow-xs);
+}
+
+.token-chip:hover {
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.token-chip:active { transform: translateY(0); }
+
+#templateEditor {
+    font-family: var(--mono);
+    font-size: 13px;
+    min-height: 240px;
+    white-space: pre;
+    tab-size: 4;
+    line-height: 1.65;
+    letter-spacing: -0.1px;
+}
+
+.template-meta {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-mid);
+    margin-top: 10px;
+    font-weight: 500;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-radius: var(--r-xs);
+    letter-spacing: -0.1px;
+    border: 1px solid var(--border);
+}
+
+/* Markdown process editor */
+.markdown-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 18px;
+    align-items: stretch;
+}
+
+.markdown-source,
+.markdown-preview-panel {
+    min-width: 0;
+}
+
+.markdown-preview-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.markdown-toolbar {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--bg-subtle);
+}
+
+/* Collapsible tool group: a single toggle keeps the toolbar to one tab
+   stop; the tools slide out sideways via the 0fr -> 1fr grid trick. */
+.md-tools-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.md-tools-toggle .chev {
+    display: inline-block;
+    font-size: 10px;
+    line-height: 1;
+    transition: transform var(--ease-out);
+}
+
+.md-tools-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+
+.md-tools-clip {
+    display: grid;
+    grid-template-columns: 0fr;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-6px);
+    transition:
+        grid-template-columns var(--ease-out),
+        opacity var(--ease-out),
+        transform var(--ease-out),
+        visibility 0.3s;
+}
+
+.md-tools-clip.open {
+    grid-template-columns: 1fr;
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+}
+
+.md-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.md-tool {
+    min-height: 30px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-xs);
+    background: var(--bg);
+    color: var(--text-mid);
+    font-family: var(--body);
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+    box-shadow: var(--shadow-xs);
+    transition: color var(--ease), border-color var(--ease), background var(--ease);
+}
+
+.md-tool:hover {
+    color: var(--accent-deep);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+#txtProcess {
+    min-height: 260px;
+    font-family: var(--mono);
+    font-size: 13px;
+    tab-size: 4;
+}
+
+.markdown-preview-label {
+    color: var(--text-mid);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.markdown-preview {
+    min-height: 310px;
+    flex: 1;
+    padding: 18px 20px;
+    overflow: auto;
+    color: var(--text);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    box-shadow: var(--shadow-inset);
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+}
+
+.markdown-preview > :first-child { margin-top: 0; }
+.markdown-preview > :last-child { margin-bottom: 0; }
+.markdown-preview p { margin: 0 0 12px; }
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+    color: var(--text-strong);
+    line-height: 1.3;
+    margin: 20px 0 10px;
+}
+.markdown-preview h1 { font-size: 24px; }
+.markdown-preview h2 { font-size: 20px; }
+.markdown-preview h3 { font-size: 17px; }
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 { font-size: 15px; }
+.markdown-preview ul,
+.markdown-preview ol {
+    margin: 0 0 14px;
+    padding-left: 26px;
+}
+.markdown-preview li { margin: 4px 0; }
+.markdown-preview blockquote {
+    margin: 0 0 14px;
+    padding: 8px 14px;
+    color: var(--text-mid);
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 var(--r-xs) var(--r-xs) 0;
+}
+.markdown-preview blockquote p { margin: 0; }
+.markdown-preview code {
+    padding: 2px 5px;
+    color: var(--accent-deep);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 0.9em;
+}
+.markdown-preview pre {
+    margin: 0 0 14px;
+    padding: 14px;
+    overflow: auto;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+}
+.markdown-preview pre code {
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    border: 0;
+}
+.markdown-preview a { color: var(--accent-deep); }
+.markdown-preview hr {
+    margin: 18px 0;
+    border: 0;
+    border-top: 1px solid var(--border-hi);
+}
+.markdown-preview .task-item {
+    list-style: none;
+    margin-left: -21px;
+}
+.markdown-preview .task-item input {
+    width: 15px;
+    height: 15px;
+    margin: 0 7px 0 0;
+    vertical-align: -2px;
+    accent-color: var(--accent);
+}
+.markdown-empty {
+    color: var(--text-faint);
+    font-style: italic;
+}
+
+/* Loading state */
+.loading .main { opacity: 0.4; pointer-events: none; }
+
+/* Responsive */
+@media (max-width: 1120px) {
+    .markdown-workspace { grid-template-columns: 1fr; }
+    .markdown-preview { min-height: 220px; }
+}
+
+@media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .status-bar { left: 0; padding: 10px 24px; }
+    .main { padding: 28px 24px 80px; }
+    .form-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body class="loading">
+<div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="logo">Ticket<br>Generator</div>
+            <div class="version" id="appVersion">Loading version&hellip;</div>
+        </div>
+        <nav class="nav-group">
+            <div class="nav-label">Workspace</div>
+            <div class="nav-item active" data-tab="ticket"><span class="nav-icon">T</span> Ticket Form</div>
+            <div class="nav-item" data-tab="request"><span class="nav-icon">Q</span> Quick Request</div>
+            <div class="nav-item" data-tab="editor"><span class="nav-icon">E</span> Template Editor</div>
+            <div class="nav-item" data-tab="daily"><span class="nav-icon">D</span> Daily Export</div>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="conn-dot" id="connStatus">Disconnected</div>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+        <!-- TICKET FORM -->
+        <div id="tab-ticket" class="panel active">
+            <div class="page-header">
+                <h2>Ticket Form</h2>
+                <div class="desc">Fill in the fields, write the process in Markdown, then generate and copy. AD Lookup auto-populates from Active Directory.</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Preset</div>
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Template</label>
+                        <select id="cmbTemplate"></select>
+                        <div id="templateMeta" class="template-meta">Select a template to auto-fill ticket details.</div>
+                    </div>
+                    <div class="field">
+                        <label id="lblTicketType">Ticket Type</label>
+                        <select id="cmbTicketType"></select>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Identity</div>
+                <div class="form-grid" id="ticketFieldsGrid"></div>
+                <div style="margin-top:14px">
+                    <button class="btn btn-outline-accent" id="btnLookup">AD Lookup</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Dropdowns</div>
+                <div class="form-grid" id="dropdownsGrid"></div>
+            </div>
+            <div class="card">
+                <div class="card-title">Description</div>
+                <div class="form-grid cols-1">
+                    <div class="field">
+                        <label>Situation</label>
+                        <textarea id="txtSituation" rows="4" placeholder="What happened?"></textarea>
+                    </div>
+                    <div class="field">
+                        <label>Process (Markdown)</label>
+                        <div class="markdown-workspace">
+                            <div class="markdown-source">
+                                <div class="markdown-toolbar" id="processMarkdownToolbar"
+                                     aria-label="Process Markdown formatting">
+                                    <button type="button" class="md-tool md-tools-toggle" id="btnToggleMdTools"
+                                            aria-expanded="false" aria-controls="mdToolsGroup">
+                                        <span class="chev" aria-hidden="true">&#9656;</span> Format
+                                    </button>
+                                    <div class="md-tools-clip" id="mdToolsGroup">
+                                        <div class="md-tools">
+                                            <button type="button" class="md-tool" data-md-action="bullet">Bullets</button>
+                                            <button type="button" class="md-tool" data-md-action="numbered">Numbered</button>
+                                            <button type="button" class="md-tool" data-md-action="bold">Bold</button>
+                                            <button type="button" class="md-tool" data-md-action="italic">Italic</button>
+                                            <button type="button" class="md-tool" data-md-action="heading">Heading</button>
+                                            <button type="button" class="md-tool" data-md-action="quote">Quote</button>
+                                            <button type="button" class="md-tool" data-md-action="code">Code</button>
+                                            <button type="button" class="md-tool" data-md-action="link">Link</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <textarea id="txtProcess" rows="10"
+                                    placeholder="- Validated the user&#10;- Reset the password&#10;- Confirmed successful access"></textarea>
+                            </div>
+                            <div class="markdown-preview-panel">
+                                <div class="markdown-preview-label">Live Preview</div>
+                                <div class="markdown-preview" id="processMarkdownPreview"
+                                     aria-live="polite"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Output</div>
+                <div class="btn-row" style="margin-bottom:14px">
+                    <div class="fmt-toggle">
+                        <div class="fmt-opt active" data-fmt="json">JSON</div>
+                        <div class="fmt-opt" data-fmt="plain">Plain</div>
+                    </div>
+                    <button class="btn btn-accent" id="btnGenerate">Generate + Copy</button>
+                    <button class="btn" id="btnCopyOutput">Copy Output</button>
+                    <button class="btn" id="btnCopyJson">Copy JSON</button>
+                    <button class="btn btn-danger" id="btnClear">Clear All</button>
+                </div>
+                <div class="output-box" id="outputBox"></div>
+            </div>
+        </div>
+
+        <!-- QUICK REQUEST -->
+        <div id="tab-request" class="panel">
+            <div class="page-header">
+                <h2>Quick Request</h2>
+                <div class="desc">Fast-track common actions. Identity syncs from the ticket form.</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Identity</div>
+                <div class="form-grid" id="requestFieldsGrid"></div>
+            </div>
+            <div class="card">
+                <div class="card-title">Actions</div>
+                <div class="action-toggles" id="actionToggles" style="margin-bottom:16px"></div>
+                <div class="btn-row">
+                    <button class="btn btn-accent" id="btnReqGenerate">Generate + Copy</button>
+                    <button class="btn" id="btnReqCopy">Copy Output</button>
+                    <button class="btn btn-danger" id="btnReqClear">Clear All</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Generated Request</div>
+                <div class="output-box" id="reqOutputBox"></div>
+            </div>
+        </div>
+
+        <!-- TEMPLATE EDITOR -->
+        <div id="tab-editor" class="panel">
+            <div class="page-header">
+                <h2>Template Editor</h2>
+                <div class="desc">Customize the Markdown output block. Click a token to insert it at the cursor; the preview renders formatting live.</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Available Tokens</div>
+                <div class="editor-tokens" id="tokenList"></div>
+            </div>
+            <div class="card">
+                <div class="card-title">Template</div>
+                <textarea id="templateEditor" rows="14"></textarea>
+                <div class="btn-row" style="margin-top:14px">
+                    <button class="btn btn-accent" id="btnSaveTemplate">Save Template</button>
+                    <button class="btn btn-danger" id="btnResetTemplate">Discard Changes</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Rendered Markdown Preview</div>
+                <div class="markdown-preview" id="previewBox" style="min-height:180px"></div>
+            </div>
+        </div>
+
+        <!-- DAILY EXPORT -->
+        <div id="tab-daily" class="panel">
+            <div class="page-header">
+                <h2>Daily Export</h2>
+                <div class="desc">Download a JSON file of every ticket generated on a given day.</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Export</div>
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="dtExportDate">Day</label>
+                        <input type="date" id="dtExportDate">
+                    </div>
+                    <div class="field">
+                        <label for="txtDayStartHour">Workday Start Hour (24h)</label>
+                        <input type="text" id="txtDayStartHour" value="7" placeholder="7">
+                    </div>
+                    <div class="field">
+                        <label for="txtDayEndHour">Workday End Hour (24h)</label>
+                        <input type="text" id="txtDayEndHour" value="16" placeholder="16">
+                    </div>
+                </div>
+                <div class="btn-row" style="margin-top:14px">
+                    <button class="btn btn-accent" id="btnDayDownload">Download Day JSON</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Filter Download for Technician</div>
+                <div class="desc" style="margin-bottom:16px">
+                    Select the JSON downloaded by the export. The complete file is parsed locally,
+                    then filtered using the technician configured in this app:
+                    <strong id="tendencyTechnicianName">Not configured</strong>.
+                </div>
+                <div class="form-grid cols-1">
+                    <div class="field">
+                        <label for="fileTendencyJson">ServiceDesk JSON</label>
+                        <input type="file" id="fileTendencyJson" accept=".json,application/json">
+                    </div>
+                </div>
+                <div class="btn-row" style="margin-top:14px">
+                    <button class="btn btn-accent" id="btnDownloadTechnicianJson" disabled>
+                        Download Filtered JSON
+                    </button>
+                    <button class="btn" id="btnClearTendencyJson" disabled>Clear</button>
+                </div>
+                <div id="tendencyImportSummary" class="template-meta" style="margin-top:14px">
+                    No ServiceDesk JSON loaded.
+                </div>
+                <div class="output-box" id="tendencyTicketList"
+                     style="display:none;min-height:120px;max-height:360px;margin-top:14px"></div>
+            </div>
+            <div class="card">
+                <div class="card-title">Deterministic Tendency Report</div>
+                <div class="desc" style="margin-bottom:16px">
+                    Generates a subject-only breakdown of recurring ticket topics—no AI.
+                    Topics that appeared only once are omitted.
+                </div>
+                <label class="report-option" style="margin-bottom:16px">
+                    <input type="checkbox" id="chkTendencyStats">
+                    <span>Show percentage &amp; ticket count</span>
+                </label>
+                <div class="btn-row">
+                    <button class="btn btn-accent" id="btnGenerateTendencyReport" disabled>
+                        Generate Report
+                    </button>
+                    <button class="btn" id="btnCopyTendencyReport" disabled>
+                        Copy Tendencies
+                    </button>
+                    <button class="btn" id="btnDownloadTendencyReport" disabled>
+                        Download Report JSON
+                    </button>
+                </div>
+                <div id="tendencyReportSummary" class="template-meta" style="margin-top:14px">
+                    Load and filter a ServiceDesk export first.
+                </div>
+                <div class="output-box" id="tendencyReportBox"
+                     style="display:none;min-height:240px;max-height:560px;margin-top:14px"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div class="status-bar">
+    <span id="statusText">Connecting...</span>
+    <span class="shortcuts">Ctrl+Enter = Generate &middot; Ctrl+Space = AD Lookup &middot; Shift+Del = Clear</span>
+</div>
+<script>
+// ====================================================================
+// STATE
+// ====================================================================
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+let CFG = {};          // everything from /api/config
+let outputFormat = 'json';
+let lastTicket = null;
+let tendencyFilterResult = null;
+let tendencyReport = null;
+
+// ====================================================================
+// API
+// ====================================================================
+async function api(path, opts = {}) {
+    const sep = path.includes('?') ? '&' : '?';
+    return (await fetch(path + sep + 'token=' + TOKEN, {
+        headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Token': TOKEN }, ...opts
+    })).json();
+}
+
+// ====================================================================
+// HELPERS
+// ====================================================================
+// NOTE: named byId, not $. A bare `$` shadows too easily and fails silently.
+const byId = id => document.getElementById(id);
+const setStatus = (t, c) => {
+    byId('statusText').textContent = t;
+    byId('statusText').style.color = c || 'var(--text-dim)';
+};
+const val = id => (byId(id)?.value || '').trim();
+const sel = id => byId(id)?.value || '';
+const setVal = (id, v) => { if (byId(id)) byId(id).value = v; };
+
+function normalizePhone(v) {
+    const d = v.replace(/\D/g, '');
+    return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : v.trim();
+}
+
+function expandTemplate(tpl, vals) {
+    let r = tpl || '';
+    for (const k in vals) r = r.replaceAll(`{{${k}}}`, vals[k] || '');
+    return r;
+}
+
+// ====================================================================
+// MARKDOWN PROCESS EDITOR
+// Dependency-free and HTML-safe. The preview is intentionally a focused
+// ServiceDesk-style subset; the original Markdown text is never altered.
+// ====================================================================
+function escapeMarkdownHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderMarkdownInline(source) {
+    const codeFragments = [];
+    let text = escapeMarkdownHtml(source);
+
+    text = text.replace(/`([^`\n]+)`/g, (_, code) => {
+        const token = `@@MD_CODE_${codeFragments.length}@@`;
+        codeFragments.push(`<code>${code}</code>`);
+        return token;
+    });
+
+    // Only explicit web/mail schemes become clickable. Everything else stays
+    // visible as text, preventing javascript: or data: URLs in the preview.
+    text = text.replace(
+        /\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)/gi,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+    text = text
+        .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/__([^_\n]+)__/g, '<strong>$1</strong>')
+        .replace(/~~([^~\n]+)~~/g, '<del>$1</del>')
+        .replace(
+            /(^|[\s(])\*([^*\n]+)\*(?=$|[\s).,!?:;])/g,
+            '$1<em>$2</em>'
+        )
+        .replace(
+            /(^|[\s(])_([^_\n]+)_(?=$|[\s).,!?:;])/g,
+            '$1<em>$2</em>'
+        );
+
+    codeFragments.forEach((fragment, index) => {
+        text = text.replace(`@@MD_CODE_${index}@@`, fragment);
+    });
+    return text;
+}
+
+function markdownBlockKind(line) {
+    if (/^```/.test(line)) return 'fence';
+    if (/^#{1,6}\s+/.test(line)) return 'heading';
+    if (/^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line)) return 'rule';
+    if (/^\s*>\s?/.test(line)) return 'quote';
+    if (/^\s*(?:[-+*]|\d+[.)])\s+/.test(line)) return 'list';
+    return '';
+}
+
+function renderProcessMarkdown(source) {
+    const markdown = String(source || '').replace(/\r\n?/g, '\n');
+    if (!markdown.trim()) {
+        return '<div class="markdown-empty">Your rendered process will appear here.</div>';
+    }
+
+    const lines = markdown.split('\n');
+    const output = [];
+    let listType = '';
+    const closeList = () => {
+        if (!listType) return;
+        output.push(`</${listType}>`);
+        listType = '';
+    };
+
+    for (let index = 0; index < lines.length; index++) {
+        const line = lines[index];
+
+        const fence = line.match(/^```\s*([a-z0-9_-]*)\s*$/i);
+        if (fence) {
+            closeList();
+            const codeLines = [];
+            index++;
+            while (index < lines.length && !/^```\s*$/.test(lines[index])) {
+                codeLines.push(lines[index]);
+                index++;
+            }
+            const language = fence[1]
+                ? ` data-language="${escapeMarkdownHtml(fence[1])}"`
+                : '';
+            output.push(
+                `<pre><code${language}>${escapeMarkdownHtml(codeLines.join('\n'))}</code></pre>`
+            );
+            continue;
+        }
+
+        if (!line.trim()) {
+            closeList();
+            continue;
+        }
+
+        const heading = line.match(/^(#{1,6})\s+(.+)$/);
+        if (heading) {
+            closeList();
+            const level = heading[1].length;
+            output.push(`<h${level}>${renderMarkdownInline(heading[2])}</h${level}>`);
+            continue;
+        }
+
+        if (/^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line)) {
+            closeList();
+            output.push('<hr>');
+            continue;
+        }
+
+        if (/^\s*>\s?/.test(line)) {
+            closeList();
+            const quoteLines = [];
+            while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+                quoteLines.push(lines[index].replace(/^\s*>\s?/, ''));
+                index++;
+            }
+            index--;
+            output.push(
+                `<blockquote><p>${quoteLines.map(renderMarkdownInline).join('<br>')}</p></blockquote>`
+            );
+            continue;
+        }
+
+        const listItem = line.match(/^\s*([-+*]|\d+[.)])\s+(.+)$/);
+        if (listItem) {
+            const nextListType = /^\d/.test(listItem[1]) ? 'ol' : 'ul';
+            if (listType !== nextListType) {
+                closeList();
+                listType = nextListType;
+                output.push(`<${listType}>`);
+            }
+
+            const task = listItem[2].match(/^\[([ xX])\]\s+(.*)$/);
+            if (task) {
+                const checked = task[1].toLowerCase() === 'x' ? ' checked' : '';
+                output.push(
+                    `<li class="task-item"><input type="checkbox" disabled${checked}>` +
+                    `${renderMarkdownInline(task[2])}</li>`
+                );
+            } else {
+                output.push(`<li>${renderMarkdownInline(listItem[2])}</li>`);
+            }
+            continue;
+        }
+
+        closeList();
+        const paragraph = [line.trim()];
+        while (
+            index + 1 < lines.length &&
+            lines[index + 1].trim() &&
+            !markdownBlockKind(lines[index + 1])
+        ) {
+            paragraph.push(lines[++index].trim());
+        }
+        output.push(`<p>${paragraph.map(renderMarkdownInline).join('<br>')}</p>`);
+    }
+
+    closeList();
+    return output.join('');
+}
+
+function updateProcessMarkdownPreview() {
+    const preview = byId('processMarkdownPreview');
+    if (preview) preview.innerHTML = renderProcessMarkdown(byId('txtProcess')?.value || '');
+}
+
+function replaceProcessSelection(replacement, selectionOffset, selectionLength) {
+    const editor = byId('txtProcess');
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    editor.value = editor.value.slice(0, start) + replacement + editor.value.slice(end);
+    editor.focus();
+    const nextStart = start + selectionOffset;
+    editor.setSelectionRange(nextStart, nextStart + selectionLength);
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function wrapProcessSelection(prefix, suffix, placeholder) {
+    const editor = byId('txtProcess');
+    const selected = editor.value.slice(editor.selectionStart, editor.selectionEnd);
+    const content = selected || placeholder;
+    replaceProcessSelection(
+        prefix + content + suffix,
+        prefix.length,
+        content.length
+    );
+}
+
+function prefixProcessLines(kind) {
+    const editor = byId('txtProcess');
+    const value = editor.value;
+    const selectionWasCollapsed = editor.selectionStart === editor.selectionEnd;
+    const start = value.lastIndexOf('\n', Math.max(0, editor.selectionStart - 1)) + 1;
+    const nextBreak = value.indexOf('\n', editor.selectionEnd);
+    const end = nextBreak === -1 ? value.length : nextBreak;
+    const lines = value.slice(start, end).split('\n');
+
+    const replacements = lines.map((line, index) => {
+        if (kind === 'bullet') {
+            return `- ${line.replace(/^\s*(?:[-+*]|\d+[.)])\s+/, '')}`;
+        }
+        if (kind === 'numbered') {
+            return `${index + 1}. ${line.replace(/^\s*(?:[-+*]|\d+[.)])\s+/, '')}`;
+        }
+        if (kind === 'heading') {
+            return `## ${line.replace(/^\s*#{1,6}\s+/, '')}`;
+        }
+        return `> ${line.replace(/^\s*>\s?/, '')}`;
+    });
+    const replacement = replacements.join('\n');
+
+    editor.setSelectionRange(start, end);
+    replaceProcessSelection(
+        replacement,
+        selectionWasCollapsed ? replacement.length : 0,
+        selectionWasCollapsed ? 0 : replacement.length
+    );
+}
+
+function applyProcessMarkdownAction(action) {
+    const editor = byId('txtProcess');
+    const selected = editor.value.slice(editor.selectionStart, editor.selectionEnd);
+
+    if (['bullet', 'numbered', 'heading', 'quote'].includes(action)) {
+        prefixProcessLines(action);
+    } else if (action === 'bold') {
+        wrapProcessSelection('**', '**', 'bold text');
+    } else if (action === 'italic') {
+        wrapProcessSelection('*', '*', 'italic text');
+    } else if (action === 'code') {
+        if (selected.includes('\n')) {
+            wrapProcessSelection('```\n', '\n```', 'code');
+        } else {
+            wrapProcessSelection('`', '`', 'code');
+        }
+    } else if (action === 'link') {
+        wrapProcessSelection('[', '](https://example.com)', 'link text');
+    }
+}
+
+// Accepts either the current object form { label, outputKey, options }
+// or a legacy bare array of option strings.
+function dropdownOptions(def) {
+    return Array.isArray(def) ? def : (def?.options || []);
+}
+function dropdownLabel(key, def) {
+    return (Array.isArray(def) ? null : def?.label) || key;
+}
+function dropdownOutputKey(key, def) {
+    const explicit = Array.isArray(def) ? null : def?.outputKey;
+    if (explicit) return explicit;
+    return key === 'ticketType' ? 'ticket_type' : '_' + key;
+}
+
+// ====================================================================
+// UI BUILDERS — construct form from config data
+// ====================================================================
+/** Build <input> fields into a grid container */
+function buildFields(containerId, fieldDefs) {
+    const grid = byId(containerId);
+    if (!grid) return;
+    grid.innerHTML = '';
+    for (const f of fieldDefs) {
+        const div = document.createElement('div');
+        div.className = 'field';
+        const lbl = document.createElement('label');
+        lbl.textContent = f.label;
+        lbl.setAttribute('for', f.id);
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = f.id;
+        if (f.placeholder) input.placeholder = f.placeholder;
+        div.appendChild(lbl);
+        div.appendChild(input);
+        grid.appendChild(div);
+    }
+}
+
+/** Build dropdown selects from config.dropdowns into a grid.
+ *  Labels come from the config, not from a hardcoded map. */
+function buildDropdowns(containerId, dropdowns) {
+    const grid = byId(containerId);
+    if (!grid) return;
+    grid.innerHTML = '';
+    for (const [key, def] of Object.entries(dropdowns)) {
+        // ticketType lives in the Preset card, handled separately
+        if (key === 'ticketType') continue;
+        const div = document.createElement('div');
+        div.className = 'field';
+        const lbl = document.createElement('label');
+        lbl.textContent = dropdownLabel(key, def);
+        const select = document.createElement('select');
+        select.id = 'cmb_' + key;
+        const defOpt = document.createElement('option');
+        defOpt.textContent = '-- Select --';
+        select.appendChild(defOpt);
+        for (const opt of dropdownOptions(def)) {
+            const o = document.createElement('option');
+            o.textContent = opt;
+            select.appendChild(o);
+        }
+        div.appendChild(lbl);
+        div.appendChild(select);
+        grid.appendChild(div);
+    }
+}
+
+/** Populate a single <select>. Accepts array or object form. */
+function populateSelect(selectId, def) {
+    const el = byId(selectId);
+    if (!el) return;
+    el.innerHTML = '';
+    for (const opt of dropdownOptions(def)) {
+        const o = document.createElement('option');
+        o.textContent = opt;
+        el.appendChild(o);
+    }
+}
+
+/** Build action toggle buttons from config.quickActions */
+function buildActionToggles(containerId, actions) {
+    const container = byId(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    for (const [key, label] of Object.entries(actions)) {
+        const btn = document.createElement('div');
+        btn.className = 'action-toggle';
+        btn.dataset.action = key;
+        btn.textContent = label;
+        btn.addEventListener('click', () => btn.classList.toggle('active'));
+        container.appendChild(btn);
+    }
+}
+
+/** Build template preset dropdown from config.templateMap */
+function buildTemplateSelect() {
+    const cmb = byId('cmbTemplate');
+    cmb.innerHTML = '<option>-- None --</option>';
+    for (const name in (CFG.templateMap || {})) {
+        const o = document.createElement('option');
+        o.textContent = name;
+        cmb.appendChild(o);
+    }
+}
+
+/** Build clickable token chips for the editor.
+ *  Dropdown tokens now come from the config instead of a fixed list. */
+function buildTokenChips() {
+    const tokens = new Set();
+
+    // Tokens derived from the configured ticket fields
+    const fieldIdToToken = {
+        txtName: 'name', txtUser: 'user', txtDept: 'department',
+        txtLocation: 'location', txtContact: 'contact', txtEmail: 'email',
+        txtTopic: 'topic', txtTechnician: 'technician'
+    };
+    for (const f of (CFG.fields?.ticket || [])) {
+        if (fieldIdToToken[f.id]) tokens.add(fieldIdToToken[f.id]);
+    }
+
+    // Always-present tokens
+    ['topic_raw', 'situation', 'subject', 'process',
+     'category', 'subcategory', 'item'].forEach(t => tokens.add(t));
+
+    // One token per configured dropdown, keyed by its config key
+    for (const key of Object.keys(CFG.dropdowns || {})) tokens.add(key);
+
+    const container = byId('tokenList');
+    container.innerHTML = '';
+    for (const t of tokens) {
+        const chip = document.createElement('div');
+        chip.className = 'token-chip';
+        chip.textContent = '{{' + t + '}}';
+        chip.addEventListener('click', () => {
+            const ed = byId('templateEditor');
+            const pos = ed.selectionStart;
+            const ins = '{{' + t + '}}';
+            ed.value = ed.value.slice(0, pos) + ins + ed.value.slice(pos);
+            ed.focus();
+            ed.selectionStart = ed.selectionEnd = pos + ins.length;
+            updatePreview();
+        });
+        container.appendChild(chip);
+    }
+}
+
+// ====================================================================
+// NAV
+// ====================================================================
+document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        item.classList.add('active');
+        byId('tab-' + item.dataset.tab).classList.add('active');
+        if (item.dataset.tab === 'request') syncIdentity();
+    });
+});
+
+// ====================================================================
+// TEMPLATE SELECTOR
+// ====================================================================
+byId('cmbTemplate').addEventListener('change', function() {
+    const name = this.value;
+    const meta = CFG.templateMap?.[name] || { Category: '', Subcategory: '', Item: '' };
+    if (!name || name === '-- None --') {
+        byId('templateMeta').textContent = 'Select a template to auto-fill ticket details.';
+        return;
+    }
+
+    const topic = meta.Topic || meta.topic || name;
+    const ticketType = meta.TicketType || meta.ticketType || '';
+    const situationTemplate = meta.SituationTemplate || meta.situationTemplate || '';
+    const processTemplate = meta.ProcessTemplate || meta.processTemplate || '';
+    const configuredValues = meta.Values || meta.values || {};
+
+    setVal('txtTopic', topic);
+    if (ticketType && [...byId('cmbTicketType').options].some(o => o.value === ticketType)) {
+        setVal('cmbTicketType', ticketType);
+    }
+
+    // Empty identity fields remain obvious, editable placeholders instead of
+    // silently disappearing from the generated text.
+    const templateValues = {
+        name: val('txtName') || '[NAME]',
+        user: val('txtUser') || '[USERNAME]',
+        department: val('txtDept') || '[DEPARTMENT]',
+        location: val('txtLocation') || '[LOCATION]',
+        contact: val('txtContact') || '[CONTACT]',
+        email: val('txtEmail') || '[EMAIL]',
+        topic,
+        ticketType: ticketType || sel('cmbTicketType'),
+        ...configuredValues
+    };
+
+    const filled = [];
+    if (situationTemplate) {
+        setVal('txtSituation', expandTemplate(situationTemplate, templateValues));
+        filled.push('situation');
+    }
+    if (processTemplate) {
+        setVal('txtProcess', expandTemplate(processTemplate, templateValues));
+        filled.push('process');
+    }
+
+    const applied = filled.length ? `  \u00b7  Filled: ${filled.join(' + ')}` : '';
+    byId('templateMeta').textContent =
+        `Category: ${meta.Category || '\u2014'}  \u00b7  Subcategory: ${meta.Subcategory || '\u2014'}  \u00b7  Item: ${meta.Item || '\u2014'}${applied}`;
+    updateProcessMarkdownPreview();
+});
+
+// ====================================================================
+// FORMAT TOGGLE
+// ====================================================================
+document.querySelectorAll('.fmt-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+        outputFormat = opt.dataset.fmt;
+        document.querySelectorAll('.fmt-opt').forEach(o => o.classList.toggle('active', o.dataset.fmt === outputFormat));
+        renderOutput();
+    });
+});
+
+// ====================================================================
+// SYNC IDENTITY -> QUICK REQUEST
+// ====================================================================
+function syncIdentity() {
+    if (val('txtName')) setVal('txtReqName', val('txtName'));
+    if (val('txtUser')) setVal('txtReqUser', val('txtUser'));
+}
+
+// ====================================================================
+// AD LOOKUP — uses mapping from server config
+// ====================================================================
+async function adLookup() {
+    const user = val('txtUser'), name = val('txtName');
+    if (!user && !name) { setStatus('Enter a username or name first.', 'var(--danger)'); return; }
+    setStatus('Looking up Active Directory...', 'var(--accent)');
+    const params = new URLSearchParams();
+    if (user) params.set('user', user);
+    if (name) params.set('name', name);
+    const data = await api('/api/ad?' + params.toString());
+    if (!data.ok) { setStatus(data.error || 'AD lookup failed.', 'var(--danger)'); return; }
+    const mapping = data._mapping || CFG.adMapping || {};
+    for (const [adProp, fieldId] of Object.entries(mapping)) {
+        const value = data[adProp];
+        if (value && byId(fieldId)) {
+            // Only fill location if empty
+            if (fieldId === 'txtLocation' && val('txtLocation')) continue;
+            setVal(fieldId, value);
+        }
+    }
+    syncIdentity();
+    setStatus('AD lookup complete.', 'var(--success)');
+}
+byId('btnLookup').addEventListener('click', adLookup);
+
+// ====================================================================
+// DROPDOWN READING — fully config-driven
+// ====================================================================
+/** Read every configured dropdown (except ticketType, handled by caller).
+ *  Returns:
+ *    byKey       -> { status: 'Open', ... }   for template tokens
+ *    byOutputKey -> { _status: 'Open', ... }  for the ticket JSON
+ *  Unselected dropdowns are omitted from byOutputKey entirely. */
+function readDropdowns() {
+    const byKey = {};
+    const byOutputKey = {};
+    for (const [key, def] of Object.entries(CFG.dropdowns || {})) {
+        if (key === 'ticketType') continue;
+        const raw = sel('cmb_' + key);
+        const v = (raw && raw !== '-- Select --') ? raw : '';
+        byKey[key] = v;
+        if (v) byOutputKey[dropdownOutputKey(key, def)] = v;
+    }
+    return { byKey, byOutputKey };
+}
+
+// ====================================================================
+// TICKET GENERATION
+// ====================================================================
+function getTicketValues() {
+    const templateName = sel('cmbTemplate');
+    const meta = CFG.templateMap?.[templateName] || { Category: '', Subcategory: '', Item: '' };
+
+    const name = val('txtName'), user = val('txtUser'), department = val('txtDept');
+    const location = val('txtLocation'), contact = normalizePhone(val('txtContact'));
+    const email = val('txtEmail'), topicRaw = val('txtTopic');
+    const situation = val('txtSituation'), process = val('txtProcess');
+    const technician = val('txtTechnician');
+    const ticketType = sel('cmbTicketType') || 'Incident';
+
+    // All other dropdowns, read straight from config
+    const { byKey, byOutputKey } = readDropdowns();
+
+    const prefix = ticketType === 'Request' ? 'Req' : 'Error';
+    let subject;
+    if (topicRaw && situation)  subject = `${prefix} [${topicRaw}] - ${situation}`;
+    else if (topicRaw)          subject = `${prefix} [${topicRaw}]`;
+    else                        subject = situation;
+
+    // values = token namespace for the plain-text template
+    const values = {
+        name, user, department, location, contact, email,
+        topic: topicRaw, topic_raw: topicRaw, situation, subject,
+        process, technician, ticketType,
+        category: meta.Category, subcategory: meta.Subcategory, item: meta.Item,
+        ...byKey
+    };
+    values.full_block = expandTemplate(CFG.blockTemplate, values);
+
+    // obj = the ticket JSON the browser extension consumes
+    const obj = {
+        name, user, department, location, contact, email,
+        topic: subject, topic_raw: topicRaw, subject,
+        situation, process,
+        ticket_type: ticketType,
+        full_block: values.full_block
+    };
+    if (email)      obj._email = email;
+    if (technician) obj._technician = technician;
+
+    // Every selected dropdown, under its configured outputKey
+    Object.assign(obj, byOutputKey);
+
+    if (meta.Category)    obj._category = meta.Category;
+    if (meta.Subcategory) obj._subcategory = meta.Subcategory;
+    if (meta.Item)        obj._item = meta.Item;
+
+    return { obj, values };
+}
+
+function renderOutput() {
+    const box = byId('outputBox');
+    if (!lastTicket) { box.textContent = ''; return; }
+    box.textContent = outputFormat === 'plain'
+        ? lastTicket.values.full_block
+        : JSON.stringify(lastTicket.obj, null, 2);
+}
+
+async function generateTicket(copy = true) {
+    lastTicket = getTicketValues();
+    renderOutput();
+    if (copy) {
+        const text = byId('outputBox').textContent;
+        const res = await api('/api/clipboard', { method: 'POST', body: JSON.stringify({ text }) });
+        setStatus(res.ok ? 'Generated and copied to clipboard.' : 'Generated, but clipboard copy failed.',
+                  res.ok ? 'var(--success)' : 'var(--danger)');
+    } else {
+        setStatus('Ticket generated.', 'var(--success)');
+    }
+}
+
+async function copyOutput() {
+    if (!lastTicket) await generateTicket(false);
+    const res = await api('/api/clipboard', { method: 'POST', body: JSON.stringify({ text: byId('outputBox').textContent }) });
+    setStatus(res.ok ? 'Output copied.' : 'Failed.', res.ok ? 'var(--success)' : 'var(--danger)');
+}
+
+async function copyJson() {
+    if (!lastTicket) lastTicket = getTicketValues();
+    const res = await api('/api/clipboard', { method: 'POST', body: JSON.stringify({ text: JSON.stringify(lastTicket.obj, null, 2) }) });
+    setStatus(res.ok ? 'JSON copied for browser extension.' : 'Failed.', res.ok ? 'var(--success)' : 'var(--danger)');
+}
+
+function clearTicketForm() {
+    if (CFG.fields?.ticket) {
+        for (const f of CFG.fields.ticket) {
+            if (f.id === 'txtTechnician' && CFG.technician) continue; // locked
+            setVal(f.id, '');
+        }
+    }
+    setVal('txtSituation', '');
+    setVal('txtProcess', '');
+    updateProcessMarkdownPreview();
+    byId('cmbTemplate').selectedIndex = 0;
+    byId('cmbTicketType').selectedIndex = 0;
+    document.querySelectorAll('#dropdownsGrid select').forEach(s => s.selectedIndex = 0);
+    byId('templateMeta').textContent = 'Select a template to auto-fill ticket details.';
+    byId('outputBox').textContent = '';
+    lastTicket = null;
+    outputFormat = 'json';
+    document.querySelectorAll('.fmt-opt').forEach(o => o.classList.toggle('active', o.dataset.fmt === 'json'));
+    byId('txtName')?.focus();
+    setStatus('Form cleared.');
+}
+
+byId('btnGenerate').addEventListener('click', () => generateTicket(true));
+byId('btnCopyOutput').addEventListener('click', copyOutput);
+byId('btnCopyJson').addEventListener('click', copyJson);
+byId('btnClear').addEventListener('click', clearTicketForm);
+
+byId('txtProcess').addEventListener('input', updateProcessMarkdownPreview);
+byId('processMarkdownToolbar').addEventListener('click', event => {
+    const button = event.target.closest('[data-md-action]');
+    if (button) applyProcessMarkdownAction(button.dataset.mdAction);
+});
+byId('btnToggleMdTools').addEventListener('click', () => {
+    const open = byId('mdToolsGroup').classList.toggle('open');
+    byId('btnToggleMdTools').setAttribute('aria-expanded', open);
+});
+byId('txtProcess').addEventListener('keydown', event => {
+    if (
+        event.key !== 'Enter' ||
+        event.shiftKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+    ) return;
+
+    const editor = event.currentTarget;
+    const beforeCaret = editor.value.slice(0, editor.selectionStart);
+    const lineStart = beforeCaret.lastIndexOf('\n') + 1;
+    const currentLine = beforeCaret.slice(lineStart);
+    const listItem = currentLine.match(/^(\s*)([-+*]|\d+[.)])\s+(.*)$/);
+    if (!listItem) return;
+
+    event.preventDefault();
+    const [, indent, marker, content] = listItem;
+    if (!content.trim()) {
+        editor.setRangeText('', lineStart, editor.selectionStart, 'end');
+    } else {
+        const nextMarker = /^\d/.test(marker)
+            ? `${Number.parseInt(marker, 10) + 1}.`
+            : marker;
+        const taskPrefix = /^\[[ xX]\]\s+/.test(content) ? '[ ] ' : '';
+        editor.setRangeText(
+            `\n${indent}${nextMarker} ${taskPrefix}`,
+            editor.selectionStart,
+            editor.selectionEnd,
+            'end'
+        );
+    }
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+});
+
+// ====================================================================
+// QUICK REQUEST
+// ====================================================================
+async function generateQuickRequest() {
+    syncIdentity();
+    const name = val('txtReqName'), user = val('txtReqUser'), okta = val('txtReqOkta');
+    const actions = [];
+    document.querySelectorAll('.action-toggle.active').forEach(b => {
+        actions.push(CFG.quickActions?.[b.dataset.action] || b.textContent);
+    });
+    // Suffix comes from config so the vendor tag can change without touching JS.
+    // Not applied to the "nothing selected" placeholder — that's a warning, not a request.
+    const suffix = CFG.quickRequestSuffix || '';
+    const header = actions.length ? actions.join(' / ') + suffix : '(No action selected)';
+    const text = `${header}\n---\nName: ${name}\nUser: ${user}\nOkta: ${okta}`.trim();
+    byId('reqOutputBox').textContent = text;
+    const res = await api('/api/clipboard', { method: 'POST', body: JSON.stringify({ text }) });
+    setStatus(res.ok ? 'Quick request copied.' : 'Generated, clipboard failed.',
+              res.ok ? 'var(--success)' : 'var(--danger)');
+}
+
+function clearQuickRequest() {
+    if (CFG.fields?.request) {
+        for (const f of CFG.fields.request) setVal(f.id, '');
+    }
+    byId('reqOutputBox').textContent = '';
+    document.querySelectorAll('.action-toggle').forEach(b => b.classList.remove('active'));
+    byId('txtReqName')?.focus();
+    setStatus('Quick request cleared.');
+}
+
+byId('btnReqGenerate').addEventListener('click', generateQuickRequest);
+byId('btnReqCopy').addEventListener('click', async () => {
+    const text = byId('reqOutputBox').textContent;
+    if (!text) { generateQuickRequest(); return; }
+    const res = await api('/api/clipboard', { method: 'POST', body: JSON.stringify({ text }) });
+    setStatus(res.ok ? 'Copied.' : 'Failed.', res.ok ? 'var(--success)' : 'var(--danger)');
+});
+byId('btnReqClear').addEventListener('click', clearQuickRequest);
+
+// ====================================================================
+// TEMPLATE EDITOR
+// ====================================================================
+const SAMPLE_BASE = {
+    name: 'Juan Perez', user: 'jperez', department: 'Finance',
+    location: 'Santa Cruz', contact: '(555) 555-1234',
+    email: 'juan.perez@company.com', topic: 'Password Reset',
+    topic_raw: 'Password Reset',
+    situation: 'User cannot sign in after password expiry.',
+    subject: 'Error [Password Reset] - User cannot sign in after password expiry.',
+    process: 'Verified identity, reset password, confirmed successful login.',
+    technician: 'Armando',
+    category: 'Applications', subcategory: 'Password Reset', item: ''
+};
+
+/** Sample values for the live preview. Dropdown samples use the first
+ *  real option from the config so the preview reflects actual data. */
+function buildSample() {
+    const s = { ...SAMPLE_BASE };
+    if (CFG.technician) s.technician = CFG.technician;
+    for (const [key, def] of Object.entries(CFG.dropdowns || {})) {
+        const opts = dropdownOptions(def);
+        if (key === 'ticketType') { s.ticketType = opts[0] || 'Incident'; continue; }
+        s[key] = opts[0] || '';
+    }
+    return s;
+}
+
+function updatePreview() {
+    const markdown = expandTemplate(
+        byId('templateEditor').value || CFG.blockTemplate,
+        buildSample()
+    );
+    byId('previewBox').innerHTML = renderProcessMarkdown(markdown);
+}
+
+byId('templateEditor').addEventListener('input', updatePreview);
+byId('btnSaveTemplate').addEventListener('click', async () => {
+    const button = byId('btnSaveTemplate');
+    const template = byId('templateEditor').value;
+    button.disabled = true;
+    setStatus('Saving template...');
+    try {
+        const result = await api('/api/template', {
+            method: 'POST',
+            body: JSON.stringify({ template })
+        });
+        if (!result.ok) throw new Error(result.error || 'Save failed.');
+        CFG.blockTemplate = template;
+        updatePreview();
+        setStatus('Template saved to block_template.txt.', 'var(--success)');
+    } catch (err) {
+        setStatus(`Template was not saved: ${err.message}`, 'var(--danger)');
+    } finally {
+        button.disabled = false;
+    }
+});
+byId('btnResetTemplate').addEventListener('click', () => {
+    byId('templateEditor').value = CFG.blockTemplate;
+    updatePreview();
+    setStatus('Unsaved template changes discarded.', 'var(--success)');
+});
+
+// ====================================================================
+// DAILY EXPORT
+// Opens a ServiceDesk tab with the export parameters in the URL hash.
+// The browser extension (content.js) picks them up on that origin,
+// waits for the user to sign in, runs the /api/v3/requests export
+// with their session, and downloads the JSON there automatically.
+// Nothing runs against the local server.
+// ====================================================================
+const SERVICEDESK_ORIGIN = 'https://servicedesk.mmmhc.com';
+
+function localToday() {
+    return new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
+}
+
+function downloadDayTickets() {
+    const selectedDate = byId('dtExportDate').value || localToday();
+    const startHour = Number(val('txtDayStartHour'));
+    const endHour = Number(val('txtDayEndHour'));
+
+    if (
+        !Number.isInteger(startHour) ||
+        !Number.isInteger(endHour) ||
+        startHour < 0 ||
+        startHour > 23 ||
+        endHour < 1 ||
+        endHour > 24 ||
+        endHour <= startHour
+    ) {
+        setStatus('The workday hours are invalid.', 'var(--danger)');
+        return;
+    }
+
+    if (Number.isNaN(new Date(`${selectedDate}T00:00:00`).getTime())) {
+        setStatus('Invalid date. Enter it in YYYY-MM-DD format.', 'var(--danger)');
+        return;
+    }
+
+    const params = { date: selectedDate, start: startHour, end: endHour };
+    window.open(
+        SERVICEDESK_ORIGIN + '/#af-export=' + encodeURIComponent(JSON.stringify(params)),
+        '_blank'
+    );
+    setStatus(
+        `Opened ServiceDesk — export for ${selectedDate} ${startHour}:00–${endHour}:00 runs there after sign-in.`,
+        'var(--success)'
+    );
+}
+
+byId('dtExportDate').value = localToday();
+byId('btnDayDownload').addEventListener('click', downloadDayTickets);
+
+// ====================================================================
+// TENDENCY INPUT
+// Parses a complete ServiceDesk export locally and keeps only requests
+// whose created_by identity matches the configured technician.
+// ====================================================================
+function normalizePersonText(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function personCandidates(person) {
+    if (typeof person === 'string' || typeof person === 'number') {
+        return [String(person)];
+    }
+    if (!person || typeof person !== 'object') return [];
+    return [
+        person.name,
+        person.display_name,
+        person.email_id,
+        person.email
+    ].filter(Boolean).map(String);
+}
+
+function personMatchesTechnician(person, technicianName) {
+    const wanted = normalizePersonText(technicianName);
+    if (!wanted) return false;
+    const wantedTokens = wanted.split(' ').filter(Boolean);
+
+    return personCandidates(person).some(candidate => {
+        const normalized = normalizePersonText(candidate);
+        if (!normalized) return false;
+        if (normalized === wanted) return true;
+
+        // Config often contains a short display name ("Armando") while
+        // ServiceDesk returns the full name ("Armando Cruz"). Match only
+        // complete normalized words, never arbitrary substrings.
+        const candidateTokens = new Set(normalized.split(' ').filter(Boolean));
+        return wantedTokens.every(token => candidateTokens.has(token));
+    });
+}
+
+function requestsFromExport(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (payload && Array.isArray(payload.requests)) return payload.requests;
+    if (payload?.response && Array.isArray(payload.response.requests)) {
+        return payload.response.requests;
+    }
+    throw new Error('This JSON does not contain a requests array.');
+}
+
+function configuredTechnicianName() {
+    return val('txtTechnician') || String(CFG.technician || '').trim();
+}
+
+function creatorIdentity(createdBy) {
+    if (typeof createdBy === 'string' || typeof createdBy === 'number') {
+        return { id: '', name: String(createdBy), email: '' };
+    }
+    return {
+        id: String(createdBy?.id || ''),
+        name: String(createdBy?.name || createdBy?.display_name || ''),
+        email: String(createdBy?.email_id || createdBy?.email || '')
+    };
+}
+
+function creatorKey(createdBy) {
+    const creator = creatorIdentity(createdBy);
+    if (creator.id) return `id:${creator.id}`;
+    if (creator.email) return `email:${normalizePersonText(creator.email)}`;
+    return `name:${normalizePersonText(creator.name)}`;
+}
+
+function renderTendencyTickets(requests) {
+    const box = byId('tendencyTicketList');
+    if (!requests.length) {
+        box.style.display = 'block';
+        box.textContent = 'No tickets matched the configured technician.';
+        return;
+    }
+
+    box.style.display = 'block';
+    box.textContent = requests.map((request, index) => {
+        const id = request?.id ? `#${request.id}` : `Ticket ${index + 1}`;
+        const time = request?.created_time?.display_value || '';
+        const subject = request?.subject || '(No subject)';
+        return [id, time, subject].filter(Boolean).join('  ·  ');
+    }).join('\n');
+}
+
+async function loadTendencyJson(file) {
+    if (!file) return;
+
+    const technicianName = configuredTechnicianName();
+    if (!technicianName) {
+        throw new Error('Set a technician in config.json before filtering.');
+    }
+
+    const payload = JSON.parse(await file.text());
+    const requests = requestsFromExport(payload);
+    const missingCreatedBy = requests.filter(request => !request?.created_by).length;
+    const matchingCreators = new Map();
+    for (const request of requests) {
+        if (!request?.created_by) continue;
+        if (!personMatchesTechnician(request.created_by, technicianName)) continue;
+        const key = creatorKey(request.created_by);
+        if (key && !matchingCreators.has(key)) {
+            matchingCreators.set(key, creatorIdentity(request.created_by));
+        }
+    }
+
+    if (matchingCreators.size > 1) {
+        const names = Array.from(matchingCreators.values())
+            .map(creator => creator.name || creator.email || creator.id)
+            .join(', ');
+        throw new Error(
+            `"${technicianName}" matches multiple created_by identities: ${names}. ` +
+            'Use the technician’s full ServiceDesk name in config.json.'
+        );
+    }
+
+    const selectedCreatorKey = matchingCreators.keys().next().value || '';
+    const matched = selectedCreatorKey
+        ? requests.filter(request =>
+            request?.created_by && creatorKey(request.created_by) === selectedCreatorKey
+        )
+        : [];
+    const creators = matchingCreators;
+
+    tendencyFilterResult = {
+        filter_metadata: {
+            generated_at: new Date().toISOString(),
+            source_file: file.name,
+            match_field: 'created_by',
+            configured_technician: technicianName,
+            match_rule: 'normalized whole-word name or email match',
+            input_record_count: requests.length,
+            missing_created_by_count: missingCreatedBy,
+            matching_record_count: matched.length,
+            matched_creators: Array.from(creators.values())
+        },
+        export_metadata: payload?.export_metadata || null,
+        requests: matched
+    };
+    clearTendencyReport();
+    byId('btnGenerateTendencyReport').disabled = matched.length === 0;
+
+    const creatorNames = Array.from(creators.values())
+        .map(creator => creator.name || creator.email || creator.id)
+        .filter(Boolean);
+    const creatorText = creatorNames.length
+        ? ` Matched creator: ${creatorNames.join(', ')}.`
+        : '';
+    const missingText = missingCreatedBy
+        ? ` ${missingCreatedBy} record(s) had no created_by value and were skipped.`
+        : '';
+
+    byId('tendencyImportSummary').textContent =
+        `Parsed ${requests.length} ticket(s) from ${file.name}. ` +
+        `Matched ${matched.length} for ${technicianName}.${creatorText}${missingText}`;
+    byId('btnDownloadTechnicianJson').disabled = false;
+    byId('btnClearTendencyJson').disabled = false;
+    renderTendencyTickets(matched);
+    setStatus(
+        `Loaded ${requests.length} tickets; ${matched.length} created by ${technicianName}.`,
+        'var(--success)'
+    );
+}
+
+function clearTendencyJson() {
+    tendencyFilterResult = null;
+    clearTendencyReport();
+    byId('fileTendencyJson').value = '';
+    byId('tendencyImportSummary').textContent = 'No ServiceDesk JSON loaded.';
+    byId('tendencyTicketList').textContent = '';
+    byId('tendencyTicketList').style.display = 'none';
+    byId('btnDownloadTechnicianJson').disabled = true;
+    byId('btnClearTendencyJson').disabled = true;
+    byId('btnGenerateTendencyReport').disabled = true;
+    setStatus('Tendency input cleared.');
+}
+
+function downloadTechnicianJson() {
+    if (!tendencyFilterResult) return;
+
+    const technician = normalizePersonText(
+        tendencyFilterResult.filter_metadata.configured_technician
+    ).replace(/\s+/g, '-');
+    const selectedDate =
+        tendencyFilterResult.export_metadata?.selected_date || localToday();
+    const blob = new Blob(
+        [JSON.stringify(tendencyFilterResult, null, 2)],
+        { type: 'application/json;charset=utf-8' }
+    );
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `servicedesk-${selectedDate}-${technician || 'technician'}-filtered.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus(
+        `Downloaded ${tendencyFilterResult.requests.length} filtered tickets.`,
+        'var(--success)'
+    );
+}
+
+// ====================================================================
+// DETERMINISTIC TENDENCY REPORT
+// ====================================================================
+const TENDENCY_STOP_WORDS = new Set([
+    // Spanish
+    'a', 'al', 'algo', 'como', 'con', 'contra', 'de', 'del', 'desde',
+    'el', 'ella', 'en', 'es', 'esta', 'este', 'esto', 'ha', 'la', 'las',
+    'le', 'lo', 'los', 'no', 'para', 'pero', 'por', 'que', 'se', 'sin',
+    'su', 'sus', 'tiene', 'un', 'una', 'usuario', 'usuarios', 'usuaria',
+    'usuarias', 'reporta', 'reportan', 'solicita', 'solicitan', 'puede',
+    'pueden', 'problema', 'problemas',
+    // English
+    'a', 'an', 'and', 'are', 'as', 'at', 'by', 'can', 'cannot', 'for',
+    'from', 'has', 'have', 'he', 'her', 'his', 'in', 'is', 'it', 'not',
+    'of', 'on', 'or', 'she', 'that', 'the', 'their', 'this', 'to', 'was',
+    'were', 'with', 'user', 'users', 'reports', 'reported', 'request',
+    'incident',
+    // Generic ticket-title scaffolding
+    'error', 'req', 'ticket', 'issue', 'assistance'
+]);
+
+const DESCRIPTION_FIELD_DEFS = [
+    { key: 'name', label: 'Name', aliases: ['name', 'nombre', 'displayname', 'user'] },
+    { key: 'username', label: 'Username', aliases: ['username', 'usuario', 'samaccountname'] },
+    { key: 'email', label: 'Email', aliases: ['email', 'correo', 'mail'] },
+    { key: 'okta_user', label: 'Okta User', aliases: ['okta user', 'oktauser', 'okta id'] },
+    { key: 'department', label: 'Department', aliases: ['department', 'departamento'] },
+    {
+        key: 'location',
+        label: 'Location',
+        aliases: [
+            'location', 'localizacion', 'localizacion actual', 'localidad',
+            'place at the time of call', 'lugar al momento de la llamada',
+            'lugar de llamada'
+        ]
+    },
+    {
+        key: 'contact',
+        label: 'Contact Number',
+        aliases: ['contact number', 'numero de contacto', 'phone number']
+    },
+    { key: 'device', label: 'Device', aliases: ['device', 'dispositivo'] },
+    { key: 'ip_phone', label: 'IP Phone', aliases: ['ip phone', 'ipphone'] },
+    {
+        key: 'inactivity_status',
+        label: 'Inactivity Status',
+        aliases: ['inactivity status', 'inactivitystatus']
+    },
+    { key: 'vdi', label: 'VDI', aliases: ['vdi'] },
+    {
+        key: 'situation',
+        label: 'Situation / Incident',
+        aliases: [
+            'situation', 'situacion', 'incident context', 'incident context situacion',
+            'descripcion de incidente', 'incident description', 'problema'
+        ]
+    },
+    { key: 'reason', label: 'Reason / Cause', aliases: ['reason', 'causa', 'reason causa'] },
+    {
+        key: 'troubleshooting',
+        label: 'Troubleshooting / Process',
+        aliases: ['troubleshoot', 'troubleshooting', 'proceso', 'process']
+    },
+    { key: 'solution', label: 'Solution', aliases: ['solution', 'solucion', 'resolution'] }
+];
+
+function reportPercent(count, total) {
+    return total ? Math.round((count / total) * 1000) / 10 : 0;
+}
+
+function frequencyDistribution(values, total = values.length) {
+    const counts = new Map();
+    for (const value of values) {
+        const key = value === null || value === undefined || value === ''
+            ? '(missing)'
+            : String(value);
+        counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return Array.from(counts, ([value, count]) => ({
+        value,
+        count,
+        percentage: reportPercent(count, total)
+    })).sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+}
+
+function nestedDisplayName(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    return String(value.name || value.display_value || value.id || '');
+}
+
+function percentile(values, fraction) {
+    if (!values.length) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const position = (sorted.length - 1) * fraction;
+    const lower = Math.floor(position);
+    const upper = Math.ceil(position);
+    const result = lower === upper
+        ? sorted[lower]
+        : sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
+    return Math.round(result * 10) / 10;
+}
+
+function durationSummary(requests, endField) {
+    const minutes = requests.map(request => {
+        const start = Number(request?.created_time?.value);
+        const end = Number(request?.[endField]?.value);
+        return Number.isFinite(start) && Number.isFinite(end) && end >= start
+            ? (end - start) / 60000
+            : null;
+    }).filter(Number.isFinite);
+
+    return {
+        sample_count: minutes.length,
+        median_minutes: percentile(minutes, 0.5),
+        p75_minutes: percentile(minutes, 0.75)
+    };
+}
+
+function plainServiceDeskText(value) {
+    return String(value || '')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(?:p|div|li|tr|h[1-6])>/gi, '\n')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;|&#160;|&#xa0;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#(x?)([0-9a-f]+);/gi, (_, hex, digits) => {
+            const code = parseInt(digits, hex ? 16 : 10);
+            return Number.isFinite(code) && code >= 0 && code <= 0x10FFFF
+                ? String.fromCodePoint(code)
+                : ' ';
+        })
+        .replace(/\r\n/g, '\n')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+function normalizedSearchText(value) {
+    return plainServiceDeskText(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9:]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function subjectTokens(subject) {
+    return normalizePersonText(subject).split(' ').filter(token => {
+        const allowedShortToken = ['ad', 'pc', 'it'].includes(token);
+        if ((token.length < 3 && !allowedShortToken) || TENDENCY_STOP_WORDS.has(token)) {
+            return false;
+        }
+        if (/^\d+$/.test(token)) return false;
+        // Remove likely account/ticket identifiers while retaining common
+        // product names such as W365 and M365.
+        if (/\d/.test(token) && !/^[wm]\d{3}$/i.test(token)) return false;
+        return true;
+    });
+}
+
+function topDocumentFrequencies(documents, minimumCount, limit) {
+    const counts = new Map();
+    for (const documentItems of documents) {
+        for (const item of new Set(documentItems)) {
+            counts.set(item, (counts.get(item) || 0) + 1);
+        }
+    }
+    return Array.from(counts, ([value, count]) => ({
+        value,
+        count,
+        percentage: reportPercent(count, documents.length)
+    }))
+        .filter(entry => entry.count >= minimumCount)
+        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+        .slice(0, limit);
+}
+
+function subjectPhrases(tokens) {
+    const phrases = [];
+    for (const size of [2, 3]) {
+        for (let index = 0; index <= tokens.length - size; index++) {
+            phrases.push(tokens.slice(index, index + size).join(' '));
+        }
+    }
+    return phrases;
+}
+
+function tokenSimilarity(a, b) {
+    let intersection = 0;
+    for (const token of a) if (b.has(token)) intersection++;
+    if (intersection < 2) return 0;
+    const union = new Set([...a, ...b]).size;
+    return union ? intersection / union : 0;
+}
+
+function recurringSubjectClusters(requests) {
+    const entries = requests.map(request => ({
+        id: String(request?.id || ''),
+        subject: String(request?.subject || ''),
+        tokens: new Set(subjectTokens(request?.subject || ''))
+    }));
+    const parent = entries.map((_, index) => index);
+
+    function find(index) {
+        while (parent[index] !== index) {
+            parent[index] = parent[parent[index]];
+            index = parent[index];
+        }
+        return index;
+    }
+    function union(a, b) {
+        const rootA = find(a);
+        const rootB = find(b);
+        if (rootA !== rootB) parent[rootB] = rootA;
+    }
+
+    for (let left = 0; left < entries.length; left++) {
+        for (let right = left + 1; right < entries.length; right++) {
+            if (tokenSimilarity(entries[left].tokens, entries[right].tokens) >= 0.45) {
+                union(left, right);
+            }
+        }
+    }
+
+    const groups = new Map();
+    entries.forEach((entry, index) => {
+        const root = find(index);
+        if (!groups.has(root)) groups.set(root, []);
+        groups.get(root).push(entry);
+    });
+
+    const recurring = [];
+    let singletonCount = 0;
+    for (const group of groups.values()) {
+        if (group.length < 2) {
+            singletonCount++;
+            continue;
+        }
+
+        const tokenCounts = new Map();
+        for (const entry of group) {
+            for (const token of entry.tokens) {
+                tokenCounts.set(token, (tokenCounts.get(token) || 0) + 1);
+            }
+        }
+        const minimumCoverage = Math.ceil(group.length * 0.6);
+        let labelTokens = Array.from(tokenCounts, ([token, count]) => ({ token, count }))
+            .filter(entry => entry.count >= minimumCoverage)
+            .sort((a, b) => b.count - a.count || a.token.localeCompare(b.token))
+            .slice(0, 4)
+            .map(entry => entry.token);
+        if (!labelTokens.length) {
+            labelTokens = Array.from(tokenCounts, ([token, count]) => ({ token, count }))
+                .sort((a, b) => b.count - a.count || a.token.localeCompare(b.token))
+                .slice(0, 3)
+                .map(entry => entry.token);
+        }
+
+        recurring.push({
+            label: labelTokens.join(' '),
+            count: group.length,
+            percentage: reportPercent(group.length, requests.length),
+            ticket_ids: group.map(entry => entry.id).filter(Boolean),
+            examples: group.slice(0, 3).map(entry => ({
+                id: entry.id,
+                subject: entry.subject
+            }))
+        });
+    }
+
+    recurring.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    return { recurring, singleton_count: singletonCount };
+}
+
+function analyzeSubjects(requests) {
+    const tokenDocuments = requests.map(request => subjectTokens(request?.subject || ''));
+    const phraseDocuments = tokenDocuments.map(subjectPhrases);
+    const clusters = recurringSubjectClusters(requests);
+
+    return {
+        common_terms: topDocumentFrequencies(tokenDocuments, 2, 20),
+        common_phrases: topDocumentFrequencies(phraseDocuments, 2, 20),
+        recurring_clusters: clusters.recurring,
+        singleton_subject_count: clusters.singleton_count,
+        bracketed_topics: frequencyDistribution(
+            requests.map(request =>
+                String(request?.subject || '').match(/\[([^\]]+)\]/)?.[1] || ''
+            ),
+            requests.length
+        ).filter(entry => entry.value !== '(missing)')
+    };
+}
+
+function subjectTopicSeed(subject) {
+    const original = plainServiceDeskText(subject).replace(/\s+/g, ' ').trim();
+    if (!original) {
+        return { label: '(No subject)', tokens: new Set(['no-subject']) };
+    }
+
+    const bracketed = original.match(/\[([^\]]+)\]/)?.[1]?.trim();
+    let label = bracketed || '';
+
+    if (!label) {
+        const dashParts = original.split(/\s+[-–—]\s+/);
+        if (dashParts.length > 1 && dashParts[0].trim()) {
+            label = dashParts[0].trim();
+        }
+    }
+
+    if (!label) {
+        const withoutParenthetical = original.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+        // Keep a short base together with its parenthetical explanation:
+        // "ARF (orientation call)" is more useful than only "ARF".
+        label = subjectTokens(withoutParenthetical).length >= 2
+            ? withoutParenthetical
+            : original.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    const tokens = subjectTokens(label);
+    return {
+        label: label || original,
+        tokens: new Set(tokens.length ? tokens : normalizePersonText(label).split(' ').filter(Boolean))
+    };
+}
+
+function topicSeedSimilarity(a, b) {
+    const smaller = a.size <= b.size ? a : b;
+    const larger = a.size <= b.size ? b : a;
+    if (smaller.size === 1) {
+        const onlyToken = smaller.values().next().value;
+        if (larger.has(onlyToken)) return 1;
+    }
+    return tokenSimilarity(a, b);
+}
+
+function buildSubjectTendencies(requests) {
+    const entries = requests.map(request => {
+        const seed = subjectTopicSeed(request?.subject || '');
+        return {
+            id: String(request?.id || ''),
+            subject: String(request?.subject || ''),
+            label: seed.label,
+            tokens: seed.tokens
+        };
+    });
+    const parent = entries.map((_, index) => index);
+
+    function find(index) {
+        while (parent[index] !== index) {
+            parent[index] = parent[parent[index]];
+            index = parent[index];
+        }
+        return index;
+    }
+    function union(a, b) {
+        const rootA = find(a);
+        const rootB = find(b);
+        if (rootA !== rootB) parent[rootB] = rootA;
+    }
+
+    for (let left = 0; left < entries.length; left++) {
+        for (let right = left + 1; right < entries.length; right++) {
+            const leftKey = normalizePersonText(entries[left].label);
+            const rightKey = normalizePersonText(entries[right].label);
+            if (
+                leftKey === rightKey ||
+                topicSeedSimilarity(entries[left].tokens, entries[right].tokens) >= 0.55
+            ) {
+                union(left, right);
+            }
+        }
+    }
+
+    const groups = new Map();
+    entries.forEach((entry, index) => {
+        const root = find(index);
+        if (!groups.has(root)) groups.set(root, []);
+        groups.get(root).push(entry);
+    });
+
+    return Array.from(groups.values()).map(group => {
+        const labels = frequencyDistribution(group.map(entry => entry.label));
+        const preferredLabel = [...labels].sort((a, b) =>
+            b.count - a.count ||
+            a.value.length - b.value.length ||
+            a.value.localeCompare(b.value)
+        )[0]?.value || '(No subject)';
+
+        return {
+            ticket: preferredLabel,
+            count: group.length,
+            percentage: reportPercent(group.length, requests.length),
+            examples: group.slice(0, 3).map(entry => ({
+                id: entry.id,
+                subject: entry.subject
+            }))
+        };
+    })
+    // The report is intentionally about tendencies. A subject/topic that
+    // occurred once is an isolated event, so it does not belong here.
+    .filter(tendency => tendency.count > 1)
+    .sort((a, b) =>
+        b.count - a.count ||
+        a.ticket.localeCompare(b.ticket)
+    );
+}
+
+function descriptionFieldPositions(description) {
+    const text = normalizedSearchText(description);
+    const candidates = [];
+    for (const definition of DESCRIPTION_FIELD_DEFS) {
+        for (const alias of definition.aliases) {
+            const normalizedAlias = normalizePersonText(alias);
+            const pattern = new RegExp(
+                `${normalizedAlias.replace(/\s+/g, '\\s+')}\\s*:`,
+                'gi'
+            );
+            let match;
+            while ((match = pattern.exec(text)) !== null) {
+                candidates.push({
+                    definition,
+                    index: match.index,
+                    end: match.index + match[0].length
+                });
+            }
+        }
+    }
+
+    // Prefer the longest known label when aliases overlap. For example,
+    // "username:" contains "name:", but only Username should be counted.
+    const nonOverlapping = candidates.filter(candidate =>
+        !candidates.some(other =>
+            other !== candidate &&
+            other.index <= candidate.index &&
+            other.end >= candidate.end &&
+            (other.end - other.index) > (candidate.end - candidate.index)
+        )
+    );
+
+    const firstByField = new Map();
+    for (const candidate of nonOverlapping) {
+        const key = candidate.definition.key;
+        const current = firstByField.get(key);
+        if (!current || candidate.index < current.index) {
+            firstByField.set(key, {
+                ...candidate.definition,
+                index: candidate.index
+            });
+        }
+    }
+    return Array.from(firstByField.values()).sort((a, b) => a.index - b.index);
+}
+
+function analyzeDescriptions(requests) {
+    const fieldCounts = new Map();
+    const layoutCounts = new Map();
+    const lengths = [];
+    const separators = { equals: 0, dashes: 0, pluses: 0 };
+
+    for (const request of requests) {
+        const raw = request?.short_description || '';
+        const plain = plainServiceDeskText(raw);
+        lengths.push(plain.length);
+
+        const fields = descriptionFieldPositions(raw);
+        for (const field of fields) {
+            fieldCounts.set(field.key, (fieldCounts.get(field.key) || 0) + 1);
+        }
+        if (fields.length) {
+            const signature = fields.map(field => field.label).join(' → ');
+            layoutCounts.set(signature, (layoutCounts.get(signature) || 0) + 1);
+        }
+
+        if (/={5,}/.test(plain)) separators.equals++;
+        if (/-{5,}/.test(plain)) separators.dashes++;
+        if (/\+{5,}/.test(plain)) separators.pluses++;
+    }
+
+    const detectedFields = DESCRIPTION_FIELD_DEFS.map(definition => {
+        const count = fieldCounts.get(definition.key) || 0;
+        return {
+            key: definition.key,
+            label: definition.label,
+            count,
+            percentage: reportPercent(count, requests.length)
+        };
+    })
+        .filter(field => field.count > 0)
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+
+    const commonLayouts = Array.from(layoutCounts, ([layout, count]) => ({
+        layout,
+        count,
+        percentage: reportPercent(count, requests.length)
+    })).sort((a, b) => b.count - a.count || a.layout.localeCompare(b.layout));
+
+    return {
+        median_character_count: percentile(lengths, 0.5),
+        detected_fields: detectedFields,
+        common_layouts: commonLayouts.slice(0, 8),
+        separator_usage: [
+            { value: 'Equals (=)', count: separators.equals, percentage: reportPercent(separators.equals, requests.length) },
+            { value: 'Dashes (-)', count: separators.dashes, percentage: reportPercent(separators.dashes, requests.length) },
+            { value: 'Pluses (+)', count: separators.pluses, percentage: reportPercent(separators.pluses, requests.length) }
+        ].filter(entry => entry.count > 0)
+    };
+}
+
+function buildTendencyReport(filteredResult) {
+    const requests = filteredResult?.requests || [];
+    if (!requests.length) throw new Error('There are no matching tickets to analyze.');
+
+    const creator = filteredResult.filter_metadata?.matched_creators?.[0] || {};
+    const tendencies = buildSubjectTendencies(requests);
+    const recurringTicketCount = tendencies.reduce(
+        (sum, tendency) => sum + tendency.count,
+        0
+    );
+
+    return {
+        report_metadata: {
+            generated_at: new Date().toISOString(),
+            method_version: 2,
+            deterministic: true,
+            source_field: 'subject',
+            technician: creator,
+            configured_technician: filteredResult.filter_metadata?.configured_technician || '',
+            ticket_count: requests.length,
+            recurring_topic_count: tendencies.length,
+            one_off_ticket_count: requests.length - recurringTicketCount,
+            source_file: filteredResult.filter_metadata?.source_file || '',
+            selected_date: filteredResult.export_metadata?.selected_date || '',
+            methods: [
+                'bracketed subject topic extraction',
+                'subject prefix extraction',
+                'normalized subject token similarity',
+                'mutually exclusive ticket grouping'
+            ]
+        },
+        tendencies
+    };
+}
+
+function tendencyReportText(report, includeStats = false, lineEnding = '\n') {
+    const lines = ['Tendencies:'];
+    if (!report.tendencies.length) {
+        lines.push('No recurring topics found.');
+    } else {
+        report.tendencies.forEach(tendency => {
+            const stats = includeStats
+                ? `: ${tendency.percentage}% ` +
+                  `(${tendency.count}/${report.report_metadata.ticket_count})`
+                : '';
+            lines.push(`- ${tendency.ticket}${stats}`);
+        });
+    }
+    return lines.join(lineEnding);
+}
+
+function renderTendencyReport(report) {
+    const box = byId('tendencyReportBox');
+    box.textContent = tendencyReportText(
+        report,
+        byId('chkTendencyStats').checked
+    );
+    box.style.display = 'block';
+}
+
+function generateTendencyReport() {
+    if (!tendencyFilterResult) return;
+    tendencyReport = buildTendencyReport(tendencyFilterResult);
+    renderTendencyReport(tendencyReport);
+    byId('btnCopyTendencyReport').disabled = false;
+    byId('btnDownloadTendencyReport').disabled = false;
+    const oneOffCount = tendencyReport.report_metadata.one_off_ticket_count;
+    byId('tendencyReportSummary').textContent =
+        `Generated a deterministic report from ${tendencyReport.report_metadata.ticket_count} ` +
+        `matching ticket(s). ${oneOffCount} one-off ticket(s) omitted.`;
+    setStatus('Deterministic tendency report generated.', 'var(--success)');
+}
+
+function clearTendencyReport() {
+    tendencyReport = null;
+    byId('tendencyReportBox').textContent = '';
+    byId('tendencyReportBox').style.display = 'none';
+    byId('btnCopyTendencyReport').disabled = true;
+    byId('btnDownloadTendencyReport').disabled = true;
+    byId('tendencyReportSummary').textContent =
+        tendencyFilterResult
+            ? 'Filtered tickets are ready. Generate the report when ready.'
+            : 'Load and filter a ServiceDesk export first.';
+}
+
+async function copyTendencyReport() {
+    if (!tendencyReport) return;
+
+    // Teams on Windows handles explicit CRLF clipboard text reliably. Sending
+    // only LF can cause its rich-text paste layer to collapse the bullet lines.
+    const text = tendencyReportText(
+        tendencyReport,
+        byId('chkTendencyStats').checked,
+        '\r\n'
+    );
+    const result = await api('/api/clipboard', {
+        method: 'POST',
+        body: JSON.stringify({ text })
+    });
+    setStatus(
+        result.ok
+            ? 'Tendencies copied with Teams-compatible line breaks.'
+            : 'Could not copy the tendency report.',
+        result.ok ? 'var(--success)' : 'var(--danger)'
+    );
+}
+
+function downloadTendencyReport() {
+    if (!tendencyReport) return;
+    const technician = normalizePersonText(
+        tendencyReport.report_metadata.technician?.name ||
+        tendencyReport.report_metadata.configured_technician
+    ).replace(/\s+/g, '-');
+    const selectedDate = tendencyReport.report_metadata.selected_date || localToday();
+    const blob = new Blob(
+        [JSON.stringify(tendencyReport, null, 2)],
+        { type: 'application/json;charset=utf-8' }
+    );
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download =
+        `servicedesk-${selectedDate}-${technician || 'technician'}-tendencies.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus('Tendency report downloaded.', 'var(--success)');
+}
+
+byId('fileTendencyJson').addEventListener('change', async event => {
+    try {
+        await loadTendencyJson(event.target.files?.[0]);
+    } catch (error) {
+        clearTendencyJson();
+        byId('tendencyImportSummary').textContent =
+            `Could not process the selected file: ${error.message}`;
+        setStatus('The ServiceDesk JSON could not be processed.', 'var(--danger)');
+    }
+});
+byId('btnDownloadTechnicianJson').addEventListener('click', downloadTechnicianJson);
+byId('btnClearTendencyJson').addEventListener('click', clearTendencyJson);
+byId('btnGenerateTendencyReport').addEventListener('click', () => {
+    try {
+        generateTendencyReport();
+    } catch (error) {
+        byId('tendencyReportSummary').textContent =
+            `Could not generate the report: ${error.message}`;
+        setStatus('Tendency report generation failed.', 'var(--danger)');
+    }
+});
+byId('chkTendencyStats').addEventListener('change', () => {
+    if (tendencyReport) renderTendencyReport(tendencyReport);
+});
+byId('btnCopyTendencyReport').addEventListener('click', copyTendencyReport);
+byId('btnDownloadTendencyReport').addEventListener('click', downloadTendencyReport);
+
+// ====================================================================
+// KEYBOARD SHORTCUTS
+// ====================================================================
+document.addEventListener('keydown', e => {
+    const tab = document.querySelector('.nav-item.active')?.dataset.tab;
+    if (e.ctrlKey && e.code === 'Space' && tab === 'ticket') { e.preventDefault(); adLookup(); return; }
+    if (e.shiftKey && e.key === 'Delete') {
+        e.preventDefault();
+        if (tab === 'ticket') clearTicketForm(); else if (tab === 'request') clearQuickRequest();
+        return;
+    }
+    if (e.key === 'Enter' && tab !== 'editor') {
+        const tag = document.activeElement?.tagName;
+        if (tag === 'TEXTAREA' && !e.ctrlKey) return;
+        if (tag === 'SELECT') return;
+        e.preventDefault();
+        if (tab === 'ticket') generateTicket(true); else if (tab === 'request') generateQuickRequest();
+    }
+});
+
+// ====================================================================
+// INIT — fetch config, build entire UI from it
+// ====================================================================
+async function init() {
+    try {
+        const data = await api('/api/config');
+        if (!data.ok) { setStatus('Config load failed.', 'var(--danger)'); return; }
+        CFG = data;
+
+        const versionLabel = CFG.displayVersion
+            ? `v${String(CFG.displayVersion).replace(/^v/i, '')}`
+            : 'version unavailable';
+        byId('appVersion').textContent = `${versionLabel} — markdown shell`;
+        document.title = `Ticket Generator ${versionLabel} — Markdown Shell`;
+
+        if (CFG.fields?.ticket) buildFields('ticketFieldsGrid', CFG.fields.ticket);
+
+        if (CFG.dropdowns) {
+            buildDropdowns('dropdownsGrid', CFG.dropdowns);
+            const tt = CFG.dropdowns.ticketType;
+            if (tt) {
+                populateSelect('cmbTicketType', tt);
+                byId('lblTicketType').textContent = dropdownLabel('ticketType', tt);
+            }
+        }
+
+        if (CFG.fields?.request) buildFields('requestFieldsGrid', CFG.fields.request);
+        if (CFG.quickActions)    buildActionToggles('actionToggles', CFG.quickActions);
+
+        // Lock technician if set in config
+        if (CFG.technician) {
+            const f = byId('txtTechnician');
+            if (f) { f.value = CFG.technician; f.readOnly = true; }
+        }
+        byId('tendencyTechnicianName').textContent =
+            configuredTechnicianName() || 'Not configured';
+
+        buildTemplateSelect();
+        buildTokenChips();
+        byId('templateEditor').value = CFG.blockTemplate || '';
+        updatePreview();
+        updateProcessMarkdownPreview();
+
+        byId('txtName')?.addEventListener('input', syncIdentity);
+        byId('txtUser')?.addEventListener('input', syncIdentity);
+
+        byId('connStatus').textContent = 'Connected';
+        byId('connStatus').classList.add('ok');
+        document.body.classList.remove('loading');
+        setStatus('Ready.', 'var(--success)');
+        byId('txtName')?.focus();
+    } catch (err) {
+        console.error('[init] failed:', err);
+        // Distinguish "server unreachable" from "server answered with
+        // something unparseable" — they have very different fixes.
+        const isNetwork = (err instanceof TypeError);
+        setStatus(
+            isNetwork
+                ? 'Cannot reach server. Is server.ps1 running?'
+                : 'Server responded, but the reply could not be read. See console.',
+            'var(--danger)'
+        );
+    }
+}
+init();
+</script>
+</body>
+</html>

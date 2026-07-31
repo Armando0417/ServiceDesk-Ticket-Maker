@@ -1,20 +1,39 @@
 # ============================================================================
-#  Ticket Generator — Local Server (v2.0)
+#  Ticket Generator — Local Server
+#  Runtime version comes from config.json -> appVersion.
 #
 #  Routes:
-#    GET  /              → serves web/index.html
+#    GET  /              → serves the current Markdown/rich-text shell
+#    GET  /legacy        → serves the previous standard shell
 #    GET  /web/*         → serves static files
 #    GET  /api/config    → sends ALL config to the frontend (single source of truth)
 #    GET  /api/ad        → AD lookup
 #    POST /api/clipboard → copies text to clipboard
-#    POST /api/save      → writes ticket JSON to current_user.json
+#    POST /api/template  → persists the plain-text output template
 #
 #  Bound to 127.0.0.1 ONLY. Nothing leaves this machine.
+#
+#  Usage:
+#    .\server.ps1            → quiet console (WARN/ERROR only) + live status line
+#    .\server.ps1 -Verbose   → full diagnostic stream on the console
+#    server.log always receives every line either way.
 # ============================================================================
+
+param(
+    [switch]$Verbose
+)
+
+$script:VerboseLogging = $Verbose.IsPresent
 
 
 # ── Dependencies ───────────────────────────────────────────────────────────
 Add-Type -AssemblyName System.Windows.Forms
+
+# ── Force UTF-8 everywhere in the console (fixes mangled unicode in Write-Host) ──
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch {}
 
 
 # ── Paths ──────────────────────────────────────────────────────────────────
@@ -26,10 +45,129 @@ $WebDir          = Join-Path $BaseDir 'web'
 $ConfigFile      = Join-Path $BaseDir 'config.json'
 $TemplateFile    = Join-Path $BaseDir 'block_template.txt'
 $TemplateMapFile = Join-Path $BaseDir 'templates.json'
-$OutputFile      = Join-Path $BaseDir 'current_user.json'
+$LogFile         = Join-Path $BaseDir 'server.log'
 
 $Port   = 8080
 $Origin = "http://127.0.0.1:$Port"
+
+
+# ============================================================================
+#  DIAGNOSTIC LOGGING
+#  — Every line goes to both the console and server.log.
+#  — Request bodies and clipboard contents are never written to the log.
+# ============================================================================
+
+$script:RequestSequence = 0
+$script:CurrentRequestId = 'startup'
+$script:LogEncoding = New-Object System.Text.UTF8Encoding($false)
+
+# ── Live status line (quiet mode only) ─────────────────────────────────────
+$script:SpinnerFrames    = @('⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏')
+$script:SpinnerIndex     = 0
+$script:StatusLineActive = $false
+$script:ServerStartTime  = Get-Date
+$script:LastActivity     = 'waiting for first request'
+
+function Clear-StatusLine {
+    # Wipe the spinner line so a real log line can print cleanly on top of it.
+    # Uses [Console]::Write (not Write-Host) so it stays safe inside finally
+    # blocks during Ctrl+C shutdown.
+    if (-not $script:StatusLineActive) { return }
+    $width = 79
+    try { $width = [Console]::BufferWidth - 1 } catch {}
+    try { [Console]::Write("`r" + (' ' * $width) + "`r") } catch {}
+    $script:StatusLineActive = $false
+}
+
+function Write-StatusLine {
+    $frame = $script:SpinnerFrames[$script:SpinnerIndex % $script:SpinnerFrames.Count]
+    $script:SpinnerIndex++
+
+    $up = (Get-Date) - $script:ServerStartTime
+    $uptime = '{0:00}:{1:00}:{2:00}' -f [math]::Floor($up.TotalHours), $up.Minutes, $up.Seconds
+
+    $line = "  $frame ONLINE  ─  up $uptime  ─  req $($script:RequestSequence)  ─  $($script:LastActivity)"
+    $width = 79
+    try { $width = [Console]::BufferWidth - 1 } catch {}
+    if ($line.Length -gt $width) { $line = $line.Substring(0, $width) }
+
+    # PadRight so a shorter frame fully overwrites the previous one.
+    try {
+        [Console]::ForegroundColor = [ConsoleColor]::Cyan
+        [Console]::Write("`r" + $line.PadRight($width))
+        [Console]::ResetColor()
+    } catch {}
+    $script:StatusLineActive = $true
+}
+
+function Write-ServerLog {
+    param(
+        [ValidateSet('DEBUG', 'INFO', 'WARN', 'ERROR', 'SUCCESS')]
+        [string]$Level = 'INFO',
+        [Parameter(Mandatory = $true)]
+        [string]$Message,
+        [string]$RequestId = ''
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RequestId)) {
+        $RequestId = if ($script:CurrentRequestId) { $script:CurrentRequestId } else { 'server' }
+    }
+
+    # Keep every event on one physical line so the log remains searchable.
+    $cleanMessage = $Message -replace "`r?`n", ' | '
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
+    $line = "[$timestamp] [$($Level.PadRight(7))] [$RequestId] $cleanMessage"
+
+    $color = switch ($Level) {
+        'DEBUG'   { [ConsoleColor]::DarkGray }
+        'INFO'    { [ConsoleColor]::Gray }
+        'WARN'    { [ConsoleColor]::Yellow }
+        'ERROR'   { [ConsoleColor]::Red }
+        'SUCCESS' { [ConsoleColor]::Green }
+    }
+
+    # Console: WARN/ERROR always print; everything else only with -Verbose.
+    # The log file receives every line regardless.
+    if ($script:VerboseLogging -or $Level -eq 'WARN' -or $Level -eq 'ERROR') {
+        Clear-StatusLine
+        Write-Host $line -ForegroundColor $color
+    }
+
+    try {
+        [System.IO.File]::AppendAllText(
+            $LogFile,
+            $line + [Environment]::NewLine,
+            $script:LogEncoding
+        )
+    } catch {
+        # Logging must never break the server. The console line above remains.
+    }
+}
+
+function Write-ServerException {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Context,
+        [Parameter(Mandatory = $true)]
+        [System.Management.Automation.ErrorRecord]$ErrorRecord
+    )
+
+    $exceptionType = if ($ErrorRecord.Exception) {
+        $ErrorRecord.Exception.GetType().FullName
+    } else {
+        'UnknownException'
+    }
+    $exceptionMessage = if ($ErrorRecord.Exception) {
+        $ErrorRecord.Exception.Message
+    } else {
+        [string]$ErrorRecord
+    }
+
+    Write-ServerLog 'ERROR' "$Context; type=$exceptionType; message=$exceptionMessage"
+    if ($ErrorRecord.ScriptStackTrace) {
+        Write-ServerLog 'ERROR' "$Context; scriptStack=$($ErrorRecord.ScriptStackTrace)"
+    }
+}
 
 
 # ============================================================================
@@ -39,17 +177,20 @@ $Origin = "http://127.0.0.1:$Port"
 # ============================================================================
 
 $DefaultConfig = @{
-    technician   = ''
+    appVersion           = '3.6.2026.731'
+    displayVersion       = '3.6'
+    technician         = ''
+    quickRequestSuffix = ' (Elevance)'
     quickActions = [ordered]@{
         reset  = 'Password Reset (Elevance)'
         unlock = 'Account Unlock'
         okta   = 'Okta Unpair'
     }
-    dropdowns = @{
-        ticketType   = @('Incident', 'Request')
-        status       = @('Open', 'closed', 'Onhold')
-        locationArea = @('Remoto', 'Presencial')
-        closureCode  = @('Success', 'Unable to Reproduce')
+    dropdowns = [ordered]@{
+        ticketType   = @{ label = 'Ticket Type';   outputKey = 'ticket_type';   options = @('Incident', 'Request') }
+        status       = @{ label = 'Status';        outputKey = '_status';       options = @('Open', 'closed', 'Onhold') }
+        locationArea = @{ label = 'Location Area'; outputKey = '_locationArea'; options = @('Remoto', 'Presencial') }
+        closureCode  = @{ label = 'Closure Code';  outputKey = '_closureCode';  options = @('Success', 'Unable to Reproduce') }
     }
     fields = @{
         ticket = @(
@@ -107,7 +248,16 @@ Proceso:
 "@
 
 $DefaultTemplateMap = [ordered]@{
-    'Password Reset'  = @{ Category = 'Applications';        Subcategory = 'Password Reset';   Item = '' }
+    'Password Reset'  = @{
+        Category          = 'Applications'
+        Subcategory       = 'Password Reset'
+        Item              = ''
+        TicketType        = 'Request'
+        Topic             = 'Password Reset'
+        SituationTemplate = 'Username ({{user}}) asks for a password reset to access {{platform}}.'
+        ProcessTemplate   = 'The password reset was completed, and we successfully validated that the user can access {{platform}}.'
+        Values            = @{ platform = '[PLATFORM]' }
+    }
     'Account Unlock'  = @{ Category = 'User Administration'; Subcategory = 'Active Directory'; Item = 'Locked Account' }
     'Orientation Call' = @{ Category = 'User Administration'; Subcategory = 'Orientation Call'; Item = '' }
     'Hardware Issues'  = @{ Category = 'Hardware';            Subcategory = 'Laptop';           Item = '' }
@@ -119,60 +269,216 @@ $DefaultTemplateMap = [ordered]@{
 #  LOADERS
 # ============================================================================
 
+# Turn a raw dropdowns blob into a consistent shape:
+#   key = @{ label = '...'; outputKey = '...'; options = @(...) }
+#
+# Accepts two forms so old configs keep working:
+#   "status": ["Open", "closed"]                     <- legacy array
+#   "status": { label, outputKey, options: [...] }   <- current
+#
+# Missing label     -> falls back to the key name
+# Missing outputKey -> '_' + key  (matches the original _status/_closureCode convention)
+function Normalize-Dropdowns($raw) {
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $out = [ordered]@{}
+    if ($null -eq $raw) {
+        Write-ServerLog 'DEBUG' 'Normalize-Dropdowns: no dropdown configuration was supplied'
+        return $out
+    }
+
+    $entries = @($raw.PSObject.Properties)
+    Write-ServerLog 'DEBUG' "Normalize-Dropdowns: processing $($entries.Count) entries"
+
+    foreach ($entry in $entries) {
+        $key = $entry.Name
+        $val = $entry.Value
+
+        # ticketType is special: it renders in the Preset card and has always
+        # emitted as 'ticket_type' (no underscore prefix). Pin its default so
+        # a legacy array-form config doesn't silently become '_ticketType'.
+        $defaultOut = if ($key -eq 'ticketType') { 'ticket_type' } else { "_$key" }
+
+        # Legacy: bare array of option strings
+        if ($val -is [System.Array]) {
+            Write-ServerLog 'DEBUG' "Normalize-Dropdowns: '$key' uses legacy array form; options=$(@($val).Count)"
+            $out[$key] = @{
+                label     = $key
+                outputKey = $defaultOut
+                options   = @($val)
+            }
+            continue
+        }
+
+        # Current: object with options
+        $label     = if ($val.label)     { [string]$val.label }     else { $key }
+        $outputKey = if ($val.outputKey) { [string]$val.outputKey } else { $defaultOut }
+        $options   = if ($val.options)   { @($val.options) }        else { @() }
+
+        Write-ServerLog 'DEBUG' "Normalize-Dropdowns: '$key'; outputKey='$outputKey'; options=$($options.Count)"
+
+        $out[$key] = @{
+            label     = $label
+            outputKey = $outputKey
+            options   = $options
+        }
+    }
+    $timer.Stop()
+    Write-ServerLog 'SUCCESS' "Normalize-Dropdowns: completed; dropdowns=$($out.Count); elapsedMs=$($timer.ElapsedMilliseconds)"
+    return $out
+}
+
 function Load-Config {
-    if (-not (Test-Path $ConfigFile)) { return $DefaultConfig }
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-ServerLog 'INFO' "Load-Config: starting; path='$ConfigFile'"
+
+    if (-not (Test-Path -LiteralPath $ConfigFile -PathType Leaf)) {
+        $timer.Stop()
+        Write-ServerLog 'WARN' "Load-Config: file not found; using defaults; elapsedMs=$($timer.ElapsedMilliseconds)"
+        return $DefaultConfig
+    }
+
     try {
-        $raw = Get-Content -Path $ConfigFile -Raw | ConvertFrom-Json -ErrorAction Stop
+        $fileInfo = Get-Item -LiteralPath $ConfigFile -ErrorAction Stop
+        Write-ServerLog 'DEBUG' "Load-Config: metadata; bytes=$($fileInfo.Length); modified='$($fileInfo.LastWriteTime.ToString('o'))'"
+
+        $readTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        $configText = [System.IO.File]::ReadAllText($ConfigFile, [System.Text.Encoding]::UTF8)
+        $readTimer.Stop()
+        Write-ServerLog 'DEBUG' "Load-Config: read completed; characters=$($configText.Length); elapsedMs=$($readTimer.ElapsedMilliseconds)"
+
+        $jsonTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        $raw = $configText | ConvertFrom-Json -ErrorAction Stop
+        $jsonTimer.Stop()
+        Write-ServerLog 'DEBUG' "Load-Config: JSON parsed; elapsedMs=$($jsonTimer.ElapsedMilliseconds)"
 
         # Merge with defaults — anything missing in config.json falls back
         $cfg = $DefaultConfig.Clone()
-        if ($null -ne $raw.technician)    { $cfg.technician   = [string]$raw.technician }
+        if ($null -ne $raw.appVersion)         { $cfg.appVersion         = [string]$raw.appVersion }
+        if ($null -ne $raw.displayVersion)     { $cfg.displayVersion     = [string]$raw.displayVersion }
+        if ($null -ne $raw.technician)         { $cfg.technician         = [string]$raw.technician }
+        if ($null -ne $raw.quickRequestSuffix) { $cfg.quickRequestSuffix = [string]$raw.quickRequestSuffix }
         if ($null -ne $raw.quickActions)  { $cfg.quickActions  = $raw.quickActions }
-        if ($null -ne $raw.dropdowns)     { $cfg.dropdowns     = $raw.dropdowns }
+        if ($null -ne $raw.dropdowns)     { $cfg.dropdowns     = Normalize-Dropdowns $raw.dropdowns }
         if ($null -ne $raw.fields)        { $cfg.fields        = $raw.fields }
         if ($null -ne $raw.adProperties)  { $cfg.adProperties  = @($raw.adProperties) }
         if ($null -ne $raw.adMapping)     { $cfg.adMapping     = $raw.adMapping }
+
+        $timer.Stop()
+        Write-ServerLog 'SUCCESS' "Load-Config: completed; technicianSet=$(-not [string]::IsNullOrWhiteSpace([string]$cfg.technician)); dropdowns=$($cfg.dropdowns.Count); ticketFields=$(@($cfg.fields.ticket).Count); requestFields=$(@($cfg.fields.request).Count); adProperties=$(@($cfg.adProperties).Count); elapsedMs=$($timer.ElapsedMilliseconds)"
         return $cfg
     } catch {
-        Write-Host "  [warn] Could not parse config.json, using defaults." -ForegroundColor Yellow
+        $timer.Stop()
+        Write-ServerException 'Load-Config failed' $_
+        Write-ServerLog 'WARN' "Load-Config: using defaults; elapsedMs=$($timer.ElapsedMilliseconds)"
         return $DefaultConfig
     }
 }
 
 function Load-BlockTemplate {
-    if (Test-Path $TemplateFile) { return (Get-Content $TemplateFile -Raw) }
-    return $DefaultBlockTemplate
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-ServerLog 'INFO' "Load-BlockTemplate: starting; path='$TemplateFile'"
+
+    if (-not (Test-Path -LiteralPath $TemplateFile -PathType Leaf)) {
+        $timer.Stop()
+        Write-ServerLog 'WARN' "Load-BlockTemplate: file not found; using default; elapsedMs=$($timer.ElapsedMilliseconds)"
+        return $DefaultBlockTemplate
+    }
+
+    try {
+        # Windows PowerShell 5.1 decorates strings returned by Get-Content
+        # with file-provider properties such as PSPath, PSDrive and
+        # PSProvider. ConvertTo-Json then recursively serializes that metadata
+        # when blockTemplate is included in /api/config; at -Depth 10 this can
+        # take long enough to appear permanently hung. ReadAllText returns a
+        # plain System.String without that extended type-system metadata.
+        $fileInfo = Get-Item -LiteralPath $TemplateFile -ErrorAction Stop
+        Write-ServerLog 'DEBUG' "Load-BlockTemplate: metadata; bytes=$($fileInfo.Length); modified='$($fileInfo.LastWriteTime.ToString('o'))'"
+
+        $template = [System.IO.File]::ReadAllText(
+            $TemplateFile,
+            [System.Text.Encoding]::UTF8
+        )
+        $timer.Stop()
+        Write-ServerLog 'SUCCESS' "Load-BlockTemplate: completed; characters=$($template.Length); psProperties=$(@($template.PSObject.Properties).Count); elapsedMs=$($timer.ElapsedMilliseconds)"
+        return $template
+    } catch {
+        $timer.Stop()
+        Write-ServerException 'Load-BlockTemplate failed' $_
+        Write-ServerLog 'WARN' "Load-BlockTemplate: using default; elapsedMs=$($timer.ElapsedMilliseconds)"
+        return $DefaultBlockTemplate
+    }
 }
 
 function Load-TemplateMap {
-    if (-not (Test-Path $TemplateMapFile)) { return $DefaultTemplateMap }
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-ServerLog 'INFO' "Load-TemplateMap: starting; path='$TemplateMapFile'"
+
+    if (-not (Test-Path -LiteralPath $TemplateMapFile -PathType Leaf)) {
+        $timer.Stop()
+        Write-ServerLog 'WARN' "Load-TemplateMap: file not found; using defaults; elapsedMs=$($timer.ElapsedMilliseconds)"
+        return $DefaultTemplateMap
+    }
+
     try {
-        $raw = Get-Content -Path $TemplateMapFile -Raw | ConvertFrom-Json -ErrorAction Stop
+        $fileInfo = Get-Item -LiteralPath $TemplateMapFile -ErrorAction Stop
+        Write-ServerLog 'DEBUG' "Load-TemplateMap: metadata; bytes=$($fileInfo.Length); modified='$($fileInfo.LastWriteTime.ToString('o'))'"
+
+        $readTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        $templateJson = [System.IO.File]::ReadAllText($TemplateMapFile, [System.Text.Encoding]::UTF8)
+        $readTimer.Stop()
+        Write-ServerLog 'DEBUG' "Load-TemplateMap: read completed; characters=$($templateJson.Length); elapsedMs=$($readTimer.ElapsedMilliseconds)"
+
+        $jsonTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        $raw = $templateJson | ConvertFrom-Json -ErrorAction Stop
+        $jsonTimer.Stop()
+        Write-ServerLog 'DEBUG' "Load-TemplateMap: JSON parsed; elapsedMs=$($jsonTimer.ElapsedMilliseconds)"
+
         $map = [ordered]@{}
-        foreach ($entry in $raw.PSObject.Properties) {
+        $entries = @($raw.PSObject.Properties)
+        Write-ServerLog 'DEBUG' "Load-TemplateMap: converting $($entries.Count) templates"
+        foreach ($entry in $entries) {
             $v = $entry.Value
-            $map[$entry.Name] = @{
-                Category    = if ($v.Category)    { [string]$v.Category }    else { '' }
-                Subcategory = if ($v.Subcategory) { [string]$v.Subcategory } else { '' }
-                Item        = if ($v.Item)        { [string]$v.Item }
-                              elseif ($v.item)    { [string]$v.item }
-                              else { '' }
+            $values = [ordered]@{}
+            if ($null -ne $v.Values) {
+                foreach ($valueEntry in $v.Values.PSObject.Properties) {
+                    $values[$valueEntry.Name] = [string]$valueEntry.Value
+                }
             }
+            $map[$entry.Name] = @{
+                Category          = if ($v.Category)          { [string]$v.Category }          else { '' }
+                Subcategory       = if ($v.Subcategory)       { [string]$v.Subcategory }       else { '' }
+                Item              = if ($v.Item)              { [string]$v.Item }
+                                    elseif ($v.item)          { [string]$v.item }
+                                    else { '' }
+                TicketType        = if ($v.TicketType)        { [string]$v.TicketType }        else { '' }
+                Topic             = if ($v.Topic)             { [string]$v.Topic }             else { '' }
+                SituationTemplate = if ($v.SituationTemplate) { [string]$v.SituationTemplate } else { '' }
+                ProcessTemplate   = if ($v.ProcessTemplate)   { [string]$v.ProcessTemplate }   else { '' }
+                Values            = $values
+            }
+            Write-ServerLog 'DEBUG' "Load-TemplateMap: converted '$($entry.Name)'; customValues=$($values.Count)"
         }
+
+        $timer.Stop()
+        Write-ServerLog 'SUCCESS' "Load-TemplateMap: completed; templates=$($map.Count); elapsedMs=$($timer.ElapsedMilliseconds)"
         return $map
     } catch {
+        $timer.Stop()
+        Write-ServerException 'Load-TemplateMap failed' $_
+        Write-ServerLog 'WARN' "Load-TemplateMap: using defaults; elapsedMs=$($timer.ElapsedMilliseconds)"
         return $DefaultTemplateMap
     }
 }
 
 # Load once at startup
+Write-ServerLog 'INFO' '==================== SERVER SESSION STARTED ===================='
+Write-ServerLog 'INFO' "Startup: PowerShell=$($PSVersionTable.PSVersion); edition=$($PSVersionTable.PSEdition); processId=$PID; baseDir='$BaseDir'; logFile='$LogFile'"
+Write-ServerLog 'INFO' 'Startup: loading configuration resources'
 $Config        = Load-Config
 $BlockTemplate = Load-BlockTemplate
 $TemplateMap   = Load-TemplateMap
 
-Write-Host ""
-Write-Host "  Config loaded." -ForegroundColor DarkGray
-Write-Host "    Technician:    $( if ($Config.technician) { $Config.technician } else { '(not set)' } )" -ForegroundColor DarkGray
+Write-ServerLog 'SUCCESS' "Startup: configuration loaded; appVersion='$($Config.appVersion)'; displayVersion='$($Config.displayVersion)'; technician='$(if ($Config.technician) { $Config.technician } else { '(not set)' })'; templates=$($TemplateMap.Count); blockCharacters=$($BlockTemplate.Length)"
 
 
 # ============================================================================
@@ -192,12 +498,27 @@ function Escape-FilterValue([string]$Value) {
 # ============================================================================
 
 function Invoke-ADLookup([string]$QueryUser, [string]$QueryName) {
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $queryKind = if ($QueryUser) { 'username' } elseif ($QueryName) { 'name' } else { 'none' }
+    $queryValue = if ($QueryUser) { $QueryUser } else { $QueryName }
+    Write-ServerLog 'INFO' "AD lookup: starting; kind=$queryKind; queryCharacters=$($queryValue.Length)"
+
     if (-not $QueryUser -and -not $QueryName) {
+        $timer.Stop()
+        Write-ServerLog 'WARN' "AD lookup: rejected because no query was supplied; elapsedMs=$($timer.ElapsedMilliseconds)"
         return @{ ok = $false; error = 'Provide a username or name to search.' }
     }
 
-    try { Import-Module ActiveDirectory -ErrorAction Stop }
-    catch { return @{ ok = $false; error = 'ActiveDirectory module is not available.' } }
+    try {
+        $moduleTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        Import-Module ActiveDirectory -ErrorAction Stop
+        $moduleTimer.Stop()
+        Write-ServerLog 'DEBUG' "AD lookup: ActiveDirectory module ready; elapsedMs=$($moduleTimer.ElapsedMilliseconds)"
+    } catch {
+        $timer.Stop()
+        Write-ServerException 'AD lookup: ActiveDirectory module import failed' $_
+        return @{ ok = $false; error = 'ActiveDirectory module is not available.' }
+    }
 
     # Pull the property list from config
     $props = @($Config.adProperties)
@@ -207,8 +528,10 @@ function Invoke-ADLookup([string]$QueryUser, [string]$QueryName) {
 
         if ($QueryUser) {
             try {
+                Write-ServerLog 'DEBUG' 'AD lookup: trying direct identity lookup'
                 $user = Get-ADUser -Identity $QueryUser -Properties $props -ErrorAction Stop
             } catch {
+                Write-ServerLog 'DEBUG' 'AD lookup: direct identity lookup did not match; trying filtered username lookup'
                 $safe = Escape-FilterValue $QueryUser
                 $user = Get-ADUser -Filter "SamAccountName -eq '$safe' -or UserPrincipalName -like '$safe*'" `
                         -Properties $props | Select-Object -First 1
@@ -216,12 +539,15 @@ function Invoke-ADLookup([string]$QueryUser, [string]$QueryName) {
         }
 
         if (-not $user -and $QueryName) {
+            Write-ServerLog 'DEBUG' 'AD lookup: trying filtered display-name lookup'
             $safe = Escape-FilterValue $QueryName
             $user = Get-ADUser -Filter "Name -like '*$safe*' -or DisplayName -like '*$safe*'" `
                     -Properties $props | Select-Object -First 1
         }
 
         if (-not $user) {
+            $timer.Stop()
+            Write-ServerLog 'WARN' "AD lookup: no matching user; elapsedMs=$($timer.ElapsedMilliseconds)"
             return @{ ok = $false; error = 'No matching AD user found.' }
         }
 
@@ -235,8 +561,13 @@ function Invoke-ADLookup([string]$QueryUser, [string]$QueryName) {
         # Also return the field mapping so the frontend knows where to put each value
         $result['_mapping'] = $Config.adMapping
 
+        $timer.Stop()
+        Write-ServerLog 'SUCCESS' "AD lookup: match returned; populatedProperties=$($result.Count - 2); elapsedMs=$($timer.ElapsedMilliseconds)"
         return $result
     } catch {
+        $timer.Stop()
+        Write-ServerException 'AD lookup failed' $_
+        Write-ServerLog 'ERROR' "AD lookup: failed; elapsedMs=$($timer.ElapsedMilliseconds)"
         return @{ ok = $false; error = "AD lookup failed: $($_.Exception.Message)" }
     }
 }
@@ -247,13 +578,22 @@ function Invoke-ADLookup([string]$QueryUser, [string]$QueryName) {
 # ============================================================================
 
 function Set-Clipboard-Text([string]$Text) {
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-ServerLog 'INFO' "Clipboard: copy requested; characters=$($Text.Length)"
+
     if ([string]::IsNullOrWhiteSpace($Text)) {
+        $timer.Stop()
+        Write-ServerLog 'WARN' "Clipboard: rejected empty text; elapsedMs=$($timer.ElapsedMilliseconds)"
         return @{ ok = $false; error = 'Nothing to copy.' }
     }
     try {
         [System.Windows.Forms.Clipboard]::SetText($Text)
+        $timer.Stop()
+        Write-ServerLog 'SUCCESS' "Clipboard: text copied; elapsedMs=$($timer.ElapsedMilliseconds)"
         return @{ ok = $true }
     } catch {
+        $timer.Stop()
+        Write-ServerException 'Clipboard copy failed' $_
         return @{ ok = $false; error = "Clipboard failed: $($_.Exception.Message)" }
     }
 }
@@ -264,51 +604,133 @@ function Set-Clipboard-Text([string]$Text) {
 # ============================================================================
 
 function Send-Json($response, [hashtable]$data, [int]$status = 200) {
-    $json   = $data | ConvertTo-Json -Depth 10
-    $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
-    $response.StatusCode       = $status
-    $response.ContentType      = 'application/json; charset=utf-8'
-    $response.Headers.Add('Access-Control-Allow-Origin', $Origin)
-    $response.ContentLength64  = $buffer.Length
-    $response.OutputStream.Write($buffer, 0, $buffer.Length)
-    $response.Close()
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $keys = if ($null -ne $data) { @($data.Keys) -join ',' } else { '(null)' }
+    Write-ServerLog 'DEBUG' "Send-Json: starting; status=$status; keys=[$keys]"
+
+    try {
+        $jsonTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        $json = ConvertTo-Json -InputObject $data -Depth 10 -ErrorAction Stop
+        $jsonTimer.Stop()
+        Write-ServerLog 'DEBUG' "Send-Json: serialization completed; characters=$($json.Length); elapsedMs=$($jsonTimer.ElapsedMilliseconds)"
+
+        $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+        $response.StatusCode       = $status
+        $response.ContentType      = 'application/json; charset=utf-8'
+        $response.Headers.Add('Access-Control-Allow-Origin', $Origin)
+        $response.ContentLength64  = $buffer.Length
+
+        $writeTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        $writeTimer.Stop()
+        $timer.Stop()
+        Write-ServerLog 'SUCCESS' "Send-Json: response written; status=$status; bytes=$($buffer.Length); writeMs=$($writeTimer.ElapsedMilliseconds); totalMs=$($timer.ElapsedMilliseconds)"
+    } catch {
+        $timer.Stop()
+        Write-ServerException 'Send-Json failed' $_
+        Write-ServerLog 'ERROR' "Send-Json: aborted; status=$status; elapsedMs=$($timer.ElapsedMilliseconds)"
+    } finally {
+        try {
+            $response.Close()
+            Write-ServerLog 'DEBUG' 'Send-Json: response closed'
+        } catch {
+            Write-ServerException 'Send-Json response close failed' $_
+        }
+    }
 }
 
 function Send-Text($response, [string]$text, [string]$contentType = 'text/plain', [int]$status = 200) {
-    $buffer = [System.Text.Encoding]::UTF8.GetBytes($text)
-    $response.StatusCode       = $status
-    $response.ContentType      = "$contentType; charset=utf-8"
-    $response.ContentLength64  = $buffer.Length
-    $response.OutputStream.Write($buffer, 0, $buffer.Length)
-    $response.Close()
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-ServerLog 'DEBUG' "Send-Text: starting; status=$status; contentType='$contentType'; characters=$($text.Length)"
+
+    try {
+        $buffer = [System.Text.Encoding]::UTF8.GetBytes($text)
+        $response.StatusCode       = $status
+        $response.ContentType      = "$contentType; charset=utf-8"
+        $response.ContentLength64  = $buffer.Length
+        $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        $timer.Stop()
+        Write-ServerLog 'SUCCESS' "Send-Text: response written; status=$status; bytes=$($buffer.Length); elapsedMs=$($timer.ElapsedMilliseconds)"
+    } catch {
+        $timer.Stop()
+        Write-ServerException 'Send-Text failed' $_
+    } finally {
+        try {
+            $response.Close()
+            Write-ServerLog 'DEBUG' 'Send-Text: response closed'
+        } catch {
+            Write-ServerException 'Send-Text response close failed' $_
+        }
+    }
 }
 
 function Send-File($response, [string]$filePath) {
-    if (-not (Test-Path $filePath)) {
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-ServerLog 'DEBUG' "Send-File: starting; path='$filePath'"
+
+    if (-not (Test-Path -LiteralPath $filePath -PathType Leaf)) {
+        $timer.Stop()
+        Write-ServerLog 'WARN' "Send-File: file not found; path='$filePath'; elapsedMs=$($timer.ElapsedMilliseconds)"
+        # Send-Text closes the response itself — return immediately so we
+        # don't fall through and try to close it a second time.
         Send-Text $response '404 Not Found' 'text/plain' 404
         return
     }
-    $ext  = [System.IO.Path]::GetExtension($filePath).ToLower()
-    $mime = @{
-        '.html' = 'text/html';       '.css'  = 'text/css'
-        '.js'   = 'application/javascript'; '.json' = 'application/json'
-        '.png'  = 'image/png';       '.svg'  = 'image/svg+xml'
-        '.ico'  = 'image/x-icon'
+    try {
+        $ext  = [System.IO.Path]::GetExtension($filePath).ToLower()
+        $mime = @{
+            '.html' = 'text/html';       '.css'  = 'text/css'
+            '.js'   = 'application/javascript'; '.json' = 'application/json'
+            '.png'  = 'image/png';       '.svg'  = 'image/svg+xml'
+            '.ico'  = 'image/x-icon'
+        }
+        $type  = if ($mime.ContainsKey($ext)) { $mime[$ext] } else { 'application/octet-stream' }
+        $bytes = [System.IO.File]::ReadAllBytes($filePath)
+        $response.StatusCode       = 200
+        $response.ContentType      = $type
+        $response.ContentLength64  = $bytes.Length
+        $response.OutputStream.Write($bytes, 0, $bytes.Length)
+        $timer.Stop()
+        Write-ServerLog 'SUCCESS' "Send-File: response written; path='$filePath'; contentType='$type'; bytes=$($bytes.Length); elapsedMs=$($timer.ElapsedMilliseconds)"
+    } catch {
+        $timer.Stop()
+        Write-ServerException "Send-File failed; path='$filePath'" $_
+    } finally {
+        try {
+            $response.Close()
+            Write-ServerLog 'DEBUG' 'Send-File: response closed'
+        } catch {
+            Write-ServerException 'Send-File response close failed' $_
+        }
     }
-    $type  = if ($mime.ContainsKey($ext)) { $mime[$ext] } else { 'application/octet-stream' }
-    $bytes = [System.IO.File]::ReadAllBytes($filePath)
-    $response.StatusCode       = 200
-    $response.ContentType      = $type
-    $response.ContentLength64  = $bytes.Length
-    $response.OutputStream.Write($bytes, 0, $bytes.Length)
-    $response.Close()
 }
 
 function Read-RequestBody($request) {
-    $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
-    $body   = $reader.ReadToEnd()
-    $reader.Close()
-    return $body
+    # NOTE: $request.ContentEncoding is NOT reliable here. HttpListener only
+    # honors a charset if the client's Content-Type header explicitly says
+    # 'charset=utf-8'. Our frontend's fetch() calls just send
+    # 'application/json' with no charset, so .ContentEncoding silently falls
+    # back to the system ANSI codepage — which mangles any unicode symbols
+    # (━ ✦ 🌿 etc.) the instant they're decoded. Force UTF-8 explicitly.
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-ServerLog 'DEBUG' "Read-RequestBody: starting; declaredBytes=$($request.ContentLength64); contentType='$($request.ContentType)'"
+
+    $reader = $null
+    try {
+        $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+        $body = $reader.ReadToEnd()
+        $timer.Stop()
+        Write-ServerLog 'SUCCESS' "Read-RequestBody: completed; characters=$($body.Length); elapsedMs=$($timer.ElapsedMilliseconds)"
+        return $body
+    } catch {
+        $timer.Stop()
+        Write-ServerException 'Read-RequestBody failed' $_
+        throw
+    } finally {
+        if ($null -ne $reader) {
+            try { $reader.Close() } catch { Write-ServerException 'Read-RequestBody reader close failed' $_ }
+        }
+    }
 }
 
 
@@ -335,36 +757,103 @@ function Handle-Request($context) {
     $path   = $req.Url.AbsolutePath
     $method = $req.HttpMethod
 
-    Write-Host "  $method $path" -ForegroundColor DarkGray
+    $script:RequestSequence++
+    $requestId = 'req-{0:D5}' -f $script:RequestSequence
+    $previousRequestId = $script:CurrentRequestId
+    $script:CurrentRequestId = $requestId
+    $requestTimer = [System.Diagnostics.Stopwatch]::StartNew()
 
-    # ── Root ───────────────────────────────────────────────────────────
+    Write-ServerLog 'INFO' "Request: accepted; method=$method; path='$path'; contentLength=$($req.ContentLength64); remote='$($req.RemoteEndPoint)'"
+
+    try {
+
+    # ── Root — current Markdown/rich-text shell ────────────────────────
     if ($path -eq '/' -or $path -eq '/index.html') {
+        Write-ServerLog 'DEBUG' 'Route: current Markdown/rich-text application shell'
         Send-File $res (Join-Path $WebDir 'index.html')
+        return
+    }
+
+    # ── Legacy shell ───────────────────────────────────────────────────
+    if ($path -eq '/legacy' -or $path -eq '/index_legacy.html') {
+        Write-ServerLog 'DEBUG' 'Route: legacy application shell'
+        Send-File $res (Join-Path $WebDir 'index_legacy.html')
         return
     }
 
     # ── Static files (/web/*) ──────────────────────────────────────────
     if ($path.StartsWith('/web/')) {
         $relative = $path.Substring(5)
-        if ($relative.Contains('..')) { Send-Text $res '403' 'text/plain' 403; return }
+        Write-ServerLog 'DEBUG' "Route: static asset; relativePath='$relative'"
+        if ($relative.Contains('..')) {
+            Write-ServerLog 'WARN' "Route: rejected static traversal attempt; relativePath='$relative'"
+            Send-Text $res '403' 'text/plain' 403
+            return
+        }
         Send-File $res (Join-Path $WebDir $relative)
+        return
+    }
+
+    # ── Favicon — answer BEFORE the token gate ─────────────────────────
+    #    The browser requests /favicon.ico on its own, with no token.
+    #    If it falls through to the 403 path it interleaves with in-flight
+    #    API responses on this single-threaded listener and tears down the
+    #    response stream mid-read (shows up client-side as a
+    #    ReadableStreamDefaultController close error).
+    #    204 No Content, empty body — the browser stops asking.
+    if ($path -eq '/favicon.ico') {
+        Write-ServerLog 'DEBUG' 'Route: favicon; returning 204'
+        try {
+            $res.StatusCode      = 204
+            $res.ContentLength64 = 0
+        } catch {
+            Write-ServerException 'Favicon response setup failed' $_
+        } finally {
+            try {
+                $res.Close()
+                Write-ServerLog 'SUCCESS' 'Favicon response: closed with 204'
+            } catch {
+                Write-ServerException 'Favicon response close failed' $_
+            }
+        }
         return
     }
 
     # ── Token gate — everything below requires auth ────────────────────
     if (-not (Check-Token $req)) {
+        Write-ServerLog 'WARN' "Authentication: rejected request; method=$method; path='$path'"
         Send-Json $res @{ ok = $false; error = 'Invalid or missing token.' } 403
         return
     }
+    Write-ServerLog 'DEBUG' 'Authentication: token accepted'
 
     # ── GET /api/config ────────────────────────────────────────────────
     #    The frontend's single source of truth.
     #    Everything the UI needs to build itself lives here.
     if ($path -eq '/api/config' -and $method -eq 'GET') {
+        $reloadTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        Write-ServerLog 'INFO' 'Route /api/config: reloading all configuration resources'
+        # Re-read from disk so edits to config.json / templates.json /
+        # block_template.txt take effect on a browser refresh (F5).
+        # No server restart needed.
+        #
+        # $script: scope matters here — without it these assignments would
+        # create function-local copies and the AD lookup route would keep
+        # using the stale startup config.
+        $script:Config        = Load-Config
+        $script:BlockTemplate = Load-BlockTemplate
+        $script:TemplateMap   = Load-TemplateMap
+        $reloadTimer.Stop()
+        Write-ServerLog 'SUCCESS' "Route /api/config: reload completed; templates=$($TemplateMap.Count); blockCharacters=$($BlockTemplate.Length); elapsedMs=$($reloadTimer.ElapsedMilliseconds)"
+
+        Write-ServerLog 'DEBUG' 'Route /api/config: constructing response object'
         Send-Json $res @{
-            ok            = $true
-            technician    = $Config.technician
-            quickActions  = $Config.quickActions
+            ok                 = $true
+            appVersion         = $Config.appVersion
+            displayVersion     = $Config.displayVersion
+            technician         = $Config.technician
+            quickRequestSuffix = $Config.quickRequestSuffix
+            quickActions       = $Config.quickActions
             dropdowns     = $Config.dropdowns
             fields        = $Config.fields
             adMapping     = $Config.adMapping
@@ -376,38 +865,82 @@ function Handle-Request($context) {
 
     # ── GET /api/ad?user=xxx  or  ?name=xxx ────────────────────────────
     if ($path -eq '/api/ad' -and $method -eq 'GET') {
+        Write-ServerLog 'INFO' 'Route /api/ad: dispatching lookup'
         $result = Invoke-ADLookup $req.QueryString['user'] $req.QueryString['name']
-        Send-Json $res $result ($(if ($result.ok) { 200 } else { 404 }))
+        $adStatus = if ($result.ok) { 200 } else { 404 }
+        Write-ServerLog 'DEBUG' "Route /api/ad: lookup finished; ok=$($result.ok); responseStatus=$adStatus"
+        Send-Json $res $result $adStatus
+        return
+    }
+
+    # ── POST /api/template ─────────────────────────────────────────────
+    #    Persists the Template Editor content across refreshes/restarts.
+    if ($path -eq '/api/template' -and $method -eq 'POST') {
+        Write-ServerLog 'INFO' 'Route /api/template: save requested'
+        $body = Read-RequestBody $req
+        try {
+            $data = $body | ConvertFrom-Json -ErrorAction Stop
+            Write-ServerLog 'DEBUG' 'Route /api/template: request JSON parsed'
+            if ($null -eq $data.template) {
+                Write-ServerLog 'WARN' 'Route /api/template: missing template property'
+                Send-Json $res @{ ok = $false; error = 'Missing template text.' } 400
+                return
+            }
+
+            $templateText = [string]$data.template
+            $templateBytes = [System.Text.Encoding]::UTF8.GetByteCount($templateText)
+            Write-ServerLog 'DEBUG' "Route /api/template: template received; characters=$($templateText.Length); utf8Bytes=$templateBytes"
+            if ($templateText.Length -gt 262144) {
+                Write-ServerLog 'WARN' "Route /api/template: rejected oversized template; characters=$($templateText.Length)"
+                Send-Json $res @{ ok = $false; error = 'Template is too large.' } 413
+                return
+            }
+
+            $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+            $saveTimer = [System.Diagnostics.Stopwatch]::StartNew()
+            [System.IO.File]::WriteAllText($TemplateFile, $templateText, $utf8NoBom)
+            $saveTimer.Stop()
+            $script:BlockTemplate = $templateText
+            Write-ServerLog 'SUCCESS' "Route /api/template: saved; path='$TemplateFile'; bytes=$templateBytes; elapsedMs=$($saveTimer.ElapsedMilliseconds)"
+            Send-Json $res @{ ok = $true }
+        } catch {
+            Write-ServerException 'Route /api/template failed' $_
+            Send-Json $res @{ ok = $false; error = 'Could not save the template.' } 500
+        }
         return
     }
 
     # ── POST /api/clipboard ────────────────────────────────────────────
     if ($path -eq '/api/clipboard' -and $method -eq 'POST') {
+        Write-ServerLog 'INFO' 'Route /api/clipboard: copy requested'
         $body = Read-RequestBody $req
         try {
-            $data   = $body | ConvertFrom-Json
+            $data   = $body | ConvertFrom-Json -ErrorAction Stop
+            Write-ServerLog 'DEBUG' 'Route /api/clipboard: request JSON parsed'
             $result = Set-Clipboard-Text $data.text
             Send-Json $res $result
         } catch {
+            Write-ServerException 'Route /api/clipboard failed' $_
             Send-Json $res @{ ok = $false; error = 'Invalid request body.' } 400
         }
         return
     }
 
-    # ── POST /api/save ─────────────────────────────────────────────────
-    if ($path -eq '/api/save' -and $method -eq 'POST') {
-        $body = Read-RequestBody $req
-        try {
-            Set-Content -Path $OutputFile -Value $body -Encoding UTF8
-            Send-Json $res @{ ok = $true; path = $OutputFile }
-        } catch {
-            Send-Json $res @{ ok = $false; error = "Save failed: $($_.Exception.Message)" } 500
-        }
-        return
-    }
-
     # ── 404 ────────────────────────────────────────────────────────────
+    Write-ServerLog 'WARN' "Route: no match; method=$method; path='$path'"
     Send-Json $res @{ ok = $false; error = "Unknown route: $path" } 404
+    } catch {
+        # Log while the request ID is still active, then let the outer request
+        # loop keep the listener alive.
+        Write-ServerException 'Request: unhandled route failure' $_
+        throw
+    } finally {
+        $requestTimer.Stop()
+        $statusCode = try { [string]$res.StatusCode } catch { 'unknown' }
+        Write-ServerLog 'INFO' "Request: finished; method=$method; path='$path'; status=$statusCode; elapsedMs=$($requestTimer.ElapsedMilliseconds)"
+        $script:LastActivity = "last: $method $path → $statusCode"
+        $script:CurrentRequestId = $previousRequestId
+    }
 }
 
 
@@ -416,35 +949,111 @@ function Handle-Request($context) {
 # ============================================================================
 
 $http = New-Object System.Net.HttpListener
-$http.Prefixes.Add("$Origin/")
-$http.Start()
-
-$StartUrl = "$Origin/?token=$Token"
-
-Write-Host ""
-Write-Host "  ============================================" -ForegroundColor DarkYellow
-Write-Host "    Ticket Generator Server v3.0"               -ForegroundColor Yellow
-Write-Host "  ============================================" -ForegroundColor DarkYellow
-Write-Host ""
-Write-Host "  Listening on:  $Origin"  -ForegroundColor Green
-Write-Host "  Token:         $Token"   -ForegroundColor DarkGray
-Write-Host "  Config:        $ConfigFile" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "  Opening browser..." -ForegroundColor DarkGray
-Write-Host "  Press Ctrl+C to stop." -ForegroundColor DarkGray
-Write-Host ""
-
-Start-Process $StartUrl
+Write-ServerLog 'INFO' "HTTP listener: created; prefix='$Origin/'"
 
 try {
-    while ($http.IsListening) {
-        Handle-Request $http.GetContext()
-    }
+    $http.Prefixes.Add("$Origin/")
+    Write-ServerLog 'DEBUG' 'HTTP listener: prefix registered'
+    $http.Start()
+    Write-ServerLog 'SUCCESS' "HTTP listener: started; isListening=$($http.IsListening)"
 } catch {
-    Write-Host "`n  Server error: $($_.Exception.Message)" -ForegroundColor Red
-} finally {
-    $http.Stop()
-    $http.Close()
-    Write-Host "  Server stopped." -ForegroundColor Yellow
+    Write-ServerException 'HTTP listener startup failed' $_
+    throw
 }
 
+$StartUrl = "$Origin/?token=$Token"
+$LegacyUrl = "$Origin/legacy?token=$Token"
+
+function Write-BannerRow([string]$label, [string]$value, [ConsoleColor]$valueColor = [ConsoleColor]::Gray) {
+    Write-Host '   ▸ ' -NoNewline -ForegroundColor DarkCyan
+    Write-Host $label.PadRight(12) -NoNewline -ForegroundColor DarkGray
+    Write-Host $value -ForegroundColor $valueColor
+}
+
+Write-Host ''
+$asciiArt = @(
+    ' ████████╗██╗ ██████╗██╗  ██╗███████╗████████╗███████╗'
+    ' ╚══██╔══╝██║██╔════╝██║ ██╔╝██╔════╝╚══██╔══╝██╔════╝'
+    '    ██║   ██║██║     █████╔╝ █████╗     ██║   ███████╗'
+    '    ██║   ██║██║     ██╔═██╗ ██╔══╝     ██║   ╚════██║'
+    '    ██║   ██║╚██████╗██║  ██╗███████╗   ██║   ███████║'
+    '    ╚═╝   ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚══════╝'
+)
+$asciiColors = @(
+    [ConsoleColor]::Cyan, [ConsoleColor]::Cyan,
+    [ConsoleColor]::DarkCyan, [ConsoleColor]::DarkCyan,
+    [ConsoleColor]::Blue, [ConsoleColor]::DarkBlue
+)
+for ($i = 0; $i -lt $asciiArt.Count; $i++) {
+    Write-Host "  $($asciiArt[$i])" -ForegroundColor $asciiColors[$i]
+}
+Write-Host ''
+Write-Host "   ── LOCAL TICKET ENGINE ─── v$($Config.appVersion) ── 127.0.0.1 only ──────────────" -ForegroundColor DarkGray
+Write-Host ''
+Write-BannerRow 'STATUS'   '● ONLINE' Green
+Write-BannerRow 'ENDPOINT' $Origin Green
+Write-BannerRow 'TOKEN'    $Token DarkGray
+Write-BannerRow 'CONFIG'   $ConfigFile DarkGray
+Write-BannerRow 'LOG'      $LogFile DarkGray
+Write-BannerRow 'DEFAULT'  $StartUrl Cyan
+Write-BannerRow 'LEGACY'   $LegacyUrl DarkGray
+if ($script:VerboseLogging) {
+    Write-BannerRow 'LOGGING' 'VERBOSE — full diagnostics on console + server.log' Yellow
+} else {
+    Write-BannerRow 'LOGGING' 'quiet — file only (run with -Verbose for console logs)' DarkGray
+}
+Write-Host ''
+Write-Host '   Opening browser…  Press Ctrl+C to stop.' -ForegroundColor DarkGray
+Write-Host ''
+
+try {
+    Write-ServerLog 'INFO' 'Browser: opening standard application URL'
+    Start-Process $StartUrl
+    Write-ServerLog 'SUCCESS' 'Browser: launch command completed'
+} catch {
+    Write-ServerException 'Browser launch failed' $_
+    Write-ServerLog 'WARN' 'Browser: open the Standard UI URL printed above manually'
+}
+
+try {
+    Write-ServerLog 'INFO' 'HTTP listener: entering request loop'
+    try { [Console]::CursorVisible = $false } catch {}
+    while ($http.IsListening) {
+        # GetContextAsync instead of the blocking GetContext: the short Wait
+        # timeout lets the status line animate between requests and makes
+        # Ctrl+C respond within ~120ms instead of hanging on a blocked call.
+        $contextTask = $http.GetContextAsync()
+        while (-not $contextTask.Wait(120)) {
+            if (-not $script:VerboseLogging) { Write-StatusLine }
+        }
+        Clear-StatusLine
+
+        # Per-request try/catch: a single malformed or aborted request
+        # should never take down the whole server.
+        try {
+            Handle-Request $contextTask.Result
+        } catch {
+            Write-ServerLog 'WARN' "Request loop: recovered after a failed request; message=$($_.Exception.Message)"
+        }
+    }
+} catch {
+    Write-ServerException 'HTTP listener: fatal loop failure' $_
+} finally {
+    Clear-StatusLine
+    try { [Console]::CursorVisible = $true } catch {}
+    Write-ServerLog 'INFO' 'Shutdown: stopping HTTP listener'
+    try {
+        $http.Stop()
+        Write-ServerLog 'DEBUG' 'Shutdown: listener stopped'
+    } catch {
+        Write-ServerException 'Shutdown: listener stop failed' $_
+    }
+    try {
+        $http.Close()
+        Write-ServerLog 'DEBUG' 'Shutdown: listener closed'
+    } catch {
+        Write-ServerException 'Shutdown: listener close failed' $_
+    }
+    Write-ServerLog 'WARN' 'Shutdown: server stopped'
+    Write-ServerLog 'INFO' '==================== SERVER SESSION ENDED ======================'
+}

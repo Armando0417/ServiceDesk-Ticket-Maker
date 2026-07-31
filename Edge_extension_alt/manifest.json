@@ -1,16 +1,18 @@
 {
     "manifest_version": 3,
-    "name": "Ticket Autofill",
+    "name": "Ticket Autofill Alt - Automatic",
     "version": "3.6.2026.731",
     "version_name": "3.6.2026.731",
-    "description": "Auto-fills ManageEngine ServiceDesk fields from clipboard JSON and runs workday ticket exports triggered by the Ticket Generator.",
+    "description": "Automatically fills ManageEngine ServiceDesk fields from clipboard JSON, with focus-based fallback.",
     "content_scripts": [
         {
             "matches": [
                 "https://servicedesk.mmmhc.com/*"
             ],
-            "js": ["content.js"],
-            "run_at": "document_start"
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_idle"
         }
     ],
     "permissions": [

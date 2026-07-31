@@ -521,6 +521,8 @@ function AF_createHUD() {
 
     var hud = document.createElement('div');
     hud.id = 'af-hud';
+    // Explicit light color-scheme prevents ServiceDesk's theme styles from
+    // leaking dark native-control colors into the injected HUD.
     hud.style.cssText = 'position:fixed;top:40px;right:12px;width:286px;box-sizing:border-box;color-scheme:light;background:#ffffff;border:1px solid #d8e0eb;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;font-size:12px;line-height:1.45;color:#172033;z-index:999999;box-shadow:0 2px 4px rgba(15,23,42,0.06),0 12px 28px rgba(15,23,42,0.14);overflow:hidden';
 
     hud.innerHTML = [
@@ -649,7 +651,249 @@ async function AF_loadClipboard() {
 }
 
 // ====================================================================
+// DAY EXPORT (auto-run)
+// The local Ticket Generator opens a ServiceDesk tab with
+// #af-export=<urlencoded json> ({date, start, end}) in the URL.
+// The request is parked in sessionStorage so it survives the login
+// redirect, then runs here — on the ServiceDesk origin, with the
+// user's session — and downloads the workday JSON automatically.
+// ====================================================================
+var AF_EXPORT_KEY = 'af_day_export';
+var AF_exportRunning = false;
+
+var AF_EXPORT_CFG = {
+    filterId: "302",
+    pageSize: 100,
+    maxPages: 100,
+    fields: [
+        "id", "subject", "short_description", "created_time", "created_by",
+        "responded_time", "completed_time", "resolved_time", "due_by_time",
+        "requester", "technician", "priority", "site", "status", "group",
+        "template", "category", "is_service_request", "is_overdue",
+        "is_first_response_overdue", "is_fcr", "has_notes", "has_attachments"
+    ]
+};
+
+function AF_exportStatus(msg, color) {
+    var st = document.getElementById('af-status');
+    if (st) { st.style.color = color || '#64748b'; st.textContent = msg; }
+    console.log('[AF] ' + msg);
+}
+
+function AF_captureExportRequest() {
+    var m = location.hash.match(/af-export=([^&]+)/);
+    if (!m) return;
+    try {
+        var params = JSON.parse(decodeURIComponent(m[1]));
+        if (params && params.date) sessionStorage.setItem(AF_EXPORT_KEY, JSON.stringify(params));
+    } catch (e) {
+        console.log('[AF] Ignoring bad export params:', e.message);
+    }
+    // Clean the hash so a refresh doesn't re-capture it
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+}
+
+// Resolves true when finished, false when blocked on sign-in (retry later).
+async function AF_runDayExport(params) {
+    var CONFIG = AF_EXPORT_CFG;
+    var selectedDate = params.date;
+    var startHour = Number(params.start);
+    var endHour = Number(params.end);
+
+    if (!Number.isInteger(startHour) || !Number.isInteger(endHour) ||
+        startHour < 0 || startHour > 23 || endHour < 1 || endHour > 24 || endHour <= startHour) {
+        throw new Error('The workday hours are invalid.');
+    }
+
+    var dayStart = new Date(selectedDate + 'T00:00:00');
+    var rangeStart = new Date(dayStart);
+    var rangeEnd = new Date(dayStart);
+    rangeStart.setHours(startHour, 0, 0, 0);
+    rangeEnd.setHours(endHour, 0, 0, 0);
+
+    var startMs = rangeStart.getTime();
+    var endMs = rangeEnd.getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+        throw new Error('Invalid date. Enter it in YYYY-MM-DD format.');
+    }
+
+    console.log('[AF] Exporting tickets from ' + rangeStart.toLocaleString() +
+        ' through ' + rangeEnd.toLocaleString());
+
+    var downloadedRequests = [];
+    var startIndex = 1;
+    var pageNumber = 1;
+    var shouldContinue = true;
+
+    while (shouldContinue && pageNumber <= CONFIG.maxPages) {
+        var inputData = {
+            list_info: {
+                row_count: CONFIG.pageSize,
+                start_index: startIndex,
+                get_total_count: true,
+                sort_field: "created_time",
+                sort_order: "desc",
+                filter_by: { id: CONFIG.filterId },
+                fields_required: CONFIG.fields
+            },
+            for: "list_view_filter"
+        };
+
+        var query = new URLSearchParams({
+            input_data: JSON.stringify(inputData),
+            SUBREQUEST: "XMLHTTP",
+            _: Date.now().toString()
+        });
+
+        var url = '/api/v3/requests?' + query.toString();
+
+        AF_exportStatus('Export: downloading page ' + pageNumber +
+            ' (' + downloadedRequests.length + ' records so far)...', '#1a5fd0');
+
+        var response = await fetch(url, {
+            method: "GET",
+            credentials: "include",
+            headers: {
+                Accept: "application/vnd.manageengine.sdp.v3+json",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            cache: "no-store"
+        });
+
+        // Not signed in yet: the API answers 401/403, or the request is
+        // redirected to the HTML login page. Park the export and retry.
+        if (response.status === 401 || response.status === 403) return false;
+        var contentType = response.headers.get('content-type') || '';
+        if (contentType.indexOf('json') === -1) return false;
+
+        if (!response.ok) {
+            var body = await response.text();
+            throw new Error('ServiceDesk returned HTTP ' + response.status + '.\n' + body);
+        }
+
+        var data = await response.json();
+        var pageRequests = Array.isArray(data.requests) ? data.requests : [];
+
+        if (pageRequests.length === 0) {
+            console.log('[AF] No additional requests were returned.');
+            break;
+        }
+
+        downloadedRequests.push.apply(downloadedRequests, pageRequests);
+
+        var timestamps = pageRequests
+            .map(function(request) { return Number(request.created_time && request.created_time.value); })
+            .filter(Number.isFinite);
+        var oldestTimestamp = timestamps.length ? Math.min.apply(null, timestamps) : null;
+        var hasMoreRows = !!(data.list_info && data.list_info.has_more_rows === true);
+
+        console.log('[AF] Page ' + pageNumber + ': ' + pageRequests.length +
+            ' records. Total downloaded: ' + downloadedRequests.length + '.');
+
+        if (oldestTimestamp !== null && oldestTimestamp < startMs) {
+            console.log('[AF] Reached tickets older than the requested workday.');
+            shouldContinue = false;
+        } else if (!hasMoreRows) {
+            console.log('[AF] ServiceDesk reports no additional rows.');
+            shouldContinue = false;
+        } else {
+            startIndex += CONFIG.pageSize;
+            pageNumber += 1;
+        }
+    }
+
+    var requestsForWorkday = downloadedRequests.filter(function(request) {
+        var timestamp = Number(request.created_time && request.created_time.value);
+        return Number.isFinite(timestamp) && timestamp >= startMs && timestamp < endMs;
+    });
+
+    requestsForWorkday.sort(function(a, b) {
+        return Number(a.created_time && a.created_time.value) -
+               Number(b.created_time && b.created_time.value);
+    });
+
+    var output = {
+        export_metadata: {
+            generated_at: new Date().toISOString(),
+            source: location.origin,
+            endpoint: "/api/v3/requests",
+            filter_id: CONFIG.filterId,
+            selected_date: selectedDate,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            workday_start: rangeStart.toISOString(),
+            workday_end_exclusive: rangeEnd.toISOString(),
+            downloaded_record_count: downloadedRequests.length,
+            matching_record_count: requestsForWorkday.length
+        },
+        requests: requestsForWorkday
+    };
+
+    var json = JSON.stringify(output, null, 2);
+    var blob = new Blob([json], { type: "application/json;charset=utf-8" });
+    var downloadUrl = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = 'servicedesk-' + selectedDate + '-' + startHour + '-' + endHour + '.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function() { URL.revokeObjectURL(downloadUrl); }, 1000);
+
+    console.log('[AF] Finished. Exported ' + requestsForWorkday.length + ' tickets.', output);
+    AF_exportStatus('Export complete: ' + requestsForWorkday.length + ' tickets for ' +
+        selectedDate + ', ' + startHour + ':00-' + endHour + ':00.', '#15803d');
+    return true;
+}
+
+function AF_exportPump() {
+    var raw = sessionStorage.getItem(AF_EXPORT_KEY);
+    if (!raw || AF_exportRunning) return;
+
+    var params;
+    try { params = JSON.parse(raw); } catch (e) {
+        sessionStorage.removeItem(AF_EXPORT_KEY);
+        return;
+    }
+
+    AF_exportRunning = true;
+    AF_runDayExport(params).then(function(finished) {
+        AF_exportRunning = false;
+        if (finished) {
+            sessionStorage.removeItem(AF_EXPORT_KEY);
+        } else {
+            AF_exportStatus('Export queued - sign in to ServiceDesk and it will run automatically.', '#d97706');
+            setTimeout(AF_exportPump, 10000);
+        }
+    }).catch(function(error) {
+        AF_exportRunning = false;
+        sessionStorage.removeItem(AF_EXPORT_KEY);
+        console.error('[AF] ServiceDesk export failed:', error);
+        AF_exportStatus('Export failed: ' + error.message, '#dc2626');
+    });
+}
+
+// ====================================================================
 // INIT
 // ====================================================================
-AF_createHUD();
+// Capture the export instruction immediately. ServiceDesk is a hash-routed
+// app and may rewrite location.hash before a document_idle script can read it.
+AF_captureExportRequest();
+
+// The manifest runs this script at document_start so the hash is safe, but
+// the HUD needs document.body. Initialize only the UI when the DOM is ready.
+function AF_startUI() {
+    if (!document.body) {
+        setTimeout(AF_startUI, 50);
+        return;
+    }
+    AF_createHUD();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', AF_startUI, { once: true });
+} else {
+    AF_startUI();
+}
+
+setTimeout(AF_exportPump, 1500);
 console.log('[AF] Focus-map autofill ready. Load JSON and tab through the form.');
