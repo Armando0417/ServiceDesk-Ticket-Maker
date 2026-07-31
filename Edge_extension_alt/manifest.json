@@ -4,6 +4,9 @@
     "version": "3.6.2026.731",
     "version_name": "3.6.2026.731",
     "description": "Automatically fills ManageEngine ServiceDesk fields from clipboard JSON, with focus-based fallback.",
+    "icons": {
+        "48": "icon.png"
+    },
     "content_scripts": [
         {
             "matches": [

@@ -4,6 +4,9 @@
     "version": "3.6.2026.731",
     "version_name": "3.6.2026.731",
     "description": "Auto-fills ManageEngine ServiceDesk fields from clipboard JSON and runs workday ticket exports triggered by the Ticket Generator.",
+    "icons": {
+        "48": "icon.png"
+    },
     "content_scripts": [
         {
             "matches": [
