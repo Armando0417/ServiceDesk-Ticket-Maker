@@ -346,7 +346,11 @@ function AF_markdownToHtml(source) {
                 index++;
             }
             index--;
-            output.push('<blockquote><p>' + quoteLines.join('<br>') + '</p></blockquote>');
+           output.push(
+                '<blockquote style="margin:0 0 12px 0;padding:2px 14px;' +
+                'border-left:4px solid #2e7cf6;background:#eef4ff;color:#0a0f1c;">' +
+                '<p style="margin:6px 0;">' + quoteLines.join('<br>') + '</p></blockquote>'
+            );
             continue;
         }
 
