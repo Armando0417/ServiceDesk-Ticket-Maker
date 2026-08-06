@@ -27,7 +27,7 @@ var AF_autoPass = 0;
 var AF_autoAttempts = {};
 var AF_AUTO_MAX_PASSES = 10;
 var AF_AUTO_SELECT_ORDER = [
-    'requester',
+    //'requester',
     'category',
     'subcategory',
     'item',
