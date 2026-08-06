@@ -60,8 +60,13 @@ Choose only one extension at a time because both target the same ServiceDesk for
 - `Edge_extension` is the recommended focus-based extension. (RECOMMENDED)
 - `Edge_extension_alt` is the optional automatic-fill alternative (nightly version).
 
-Open `edge://extensions` or `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select the desired extension folder.
+Open `edge://extensions` or `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select the desired extension folder. 
 
+> The `Daily Export` ONLY WORKS when using the normal extension. Not the Alt variant. My recommendation is to use the ticket generator in a 2nd browser and install only the normal extension there (if you plan on using the automatic one). 
+
+> There's also a bug when using the daily export. If you are signed out when trying to download the tickets of the day, then log-in, then close the tab and extract the tickets again
+
+ 
 ## Runtime files
 
 The following local files are intentionally excluded from source control:
